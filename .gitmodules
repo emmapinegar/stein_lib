@@ -1,0 +1,3 @@
+[submodule "Bayesian_Hilbert_Maps"]
+	path = Bayesian_Hilbert_Maps
+	url = https://github.com/emmapinegar/Bayesian_Hilbert_Maps

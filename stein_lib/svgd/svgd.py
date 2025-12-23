@@ -240,10 +240,7 @@ class SVGD():
             M,
         )
         if self.verbose:
-            print('gradient l2-norm: {:5.4f}'.format(
-                grad.norm().detach().cpu().numpy()))
-            print('repulsive l2-norm: {:5.4f}'.format(
-                rep.norm().detach().cpu().numpy()))
+            print(f"gradient l2-norm: {grad.norm().detach().cpu().numpy():5.4f} \t repulsive l2-norm: {rep.norm().detach().cpu().numpy():5.4f}")
 
         # SVGD gradient
         phi = grad + self.repulsive_scaling * rep
@@ -373,7 +370,7 @@ class SVGD():
                 optimizer.step(closure)
             dt = time() - t_start
             if self.verbose:
-                print('dt (SVGD): {}\n'.format(dt))
+                print(f"i: {i} \t dt (SVGD): {dt}\n")
             dts.append(dt)
             particle_history.append(X.clone().detach().cpu().numpy())
         dt_stats = np.array(dts)
