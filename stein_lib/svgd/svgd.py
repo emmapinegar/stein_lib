@@ -171,11 +171,7 @@ class SVGD():
         pw_dists_sq:
 
         """
-        k_XX, grad_k, _, pw_dists_sq = self.kernel.eval(
-            X, X.clone().detach(),
-            M,
-            compute_dK_dK_t=False,
-        )
+        k_XX, grad_k, _, pw_dists_sq = self.kernel.eval(X, X.clone().detach(),M,compute_dK_dK_t=False,)
         return k_XX, grad_k, pw_dists_sq
     
     def phi(

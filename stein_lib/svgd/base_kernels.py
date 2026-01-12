@@ -119,14 +119,7 @@ class RBF(BaseKernel):
 
         return h, pairwise_dists_sq
 
-    def eval(
-            self,
-            X, Y,
-            M=None,
-            compute_dK_dK_t=False,
-            bw=None,
-            **kwargs,
-    ):
+    def eval(self, X, Y, M=None, compute_dK_dK_t=False, bw=None, **kwargs,):
 
         assert X.shape == Y.shape
 
@@ -150,12 +143,7 @@ class RBF(BaseKernel):
                     d_K_Xi.unsqueeze(3),
                     d_K_Xi.unsqueeze(2),
                 )
-        return (
-            K,
-            d_K_Xi,
-            dK_dK_t,
-            pw_dists_sq,
-        )
+        return (K, d_K_Xi, dK_dK_t, pw_dists_sq,)
 
 
 class IMQ(BaseKernel):
@@ -246,27 +234,13 @@ class RBF_Anisotropic(RBF):
     """
         k(x, x') = exp( - (x - y) M (x - y)^T / (2 * d))
     """
-    def __init__(
-        self,
-        hessian_scale=1,
-        analytic_grad=True,
-        median_heuristic=False,
-        **kwargs,
-    ):
-        super().__init__(
-            analytic_grad,
-        )
+    def __init__(self, hessian_scale=1, analytic_grad=True, median_heuristic=False, **kwargs,):
+        super().__init__(analytic_grad,)
         self.hessian_scale = hessian_scale
         self.median_heuristic = median_heuristic
 
-    def eval(
-        self,
-        X, Y,
-        M=None,
-        compute_dK_dK_t=False,
-        bw=None,
-        **kwargs,
-    ):
+
+    def eval(self,X, Y,M=None, compute_dK_dK_t=False, bw=None, **kwargs,):
 
         assert X.shape == Y.shape
 
@@ -306,12 +280,7 @@ class RBF_Anisotropic(RBF):
                     d_K_Xi.unsqueeze(3),
                     d_K_Xi.unsqueeze(2),
                 )
-        return (
-            K,
-            d_K_Xi,
-            dK_dK_t,
-            pw_dists_sq,
-        )
+        return (K, d_K_Xi, dK_dK_t, pw_dists_sq,)
 
 
 class Linear(BaseKernel):
