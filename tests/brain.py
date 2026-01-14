@@ -36,18 +36,18 @@ torch.set_default_dtype(torch.float64)
 def test_brain_3D():
     ###### Params ######
     # num_particles = 100
-    num_particles = 1000
+    num_particles = 10000
     # iters = 3000
     # iters = 200
-    iters = 50
+    iters = 100
     # iters = 1
 
     # Sample intial particles
     torch.manual_seed(5432876)
 
-    for i in range(10):
+    for i in range(1):
         ## Large Gaussian in center of remind map.
-        prior_dist = Normal(loc=torch.tensor([30.,90.,15.]), scale=torch.tensor([10.,10.,6.]))
+        # prior_dist = Normal(loc=torch.tensor([30.,90.,15.]), scale=torch.tensor([20.,20.,20.]))
 
         ## Small gaussian in corner of remind map.
         # prior_dist = Normal(loc=torch.tensor([12.,-3.]), scale=torch.tensor([1.,1.]))
@@ -58,7 +58,7 @@ def test_brain_3D():
         # prior_dist = mixture_of_gaussians(num_comp=2, mu_list=[[12.,-3.], [-5, -18] ], sigma_list=radii_list,)
 
         # Uniform distribution
-        # prior_dist = Uniform(low=torch.tensor([0., 20., -30.]), high=torch.tensor([80., 140., 40.]))
+        prior_dist = Uniform(low=torch.tensor([-30., 20., -40.]), high=torch.tensor([100., 160., 50.]))
 
 
         particles_0 = prior_dist.sample((num_particles,))
@@ -85,9 +85,9 @@ def test_brain_3D():
         kernel_base_type = 'RBF_Anisotropic'
         # optimizer_type = 'SGD'
         optimizer_type = 'Adam'
-        step_size = 1
+        step_size = 0.5
         # step_size = 0.
-        svgd = SVGD(kernel_base_type=kernel_base_type, kernel_structure=None, median_heuristic=False, repulsive_scaling=5.,
+        svgd = SVGD(kernel_base_type=kernel_base_type, kernel_structure=None, median_heuristic=True, repulsive_scaling=0.5,
             geom_metric_type='fisher', verbose=True, bandwidth=5.,)
 
 
@@ -108,15 +108,15 @@ def test_brain_3D():
         particles_ = particles.detach().numpy()
         old_particles = np.loadtxt("./remind_001_samples.txt")
 
-        particles_ = np.vstack((old_particles[:,0:3], particles_))
-        np.savetxt("./remind_001_samples.txt", particles_, fmt='%9f ')
+        # particles_ = np.vstack((old_particles[:,0:3], particles_))
+        # np.savetxt("./remind_001_samples.txt", particles_, fmt='%9f ')
 
         plot_graph_2D_slices(particles.detach(), model.log_prob, ax_limits=ax_limits, to_numpy=True,
             save_path='./figures/graph_svgd_{}_bhm_remind3d_np_{}_eps_{}.png'.format(kernel_base_type, num_particles, step_size,),)    
 
-        # # Make movie
-        # create_movie_2D_slices(p_hist, model.log_prob, to_numpy=True, save_path='./figures/svgd_{}_bhm_remind3d_np_{}_eps_{}.mp4'.format(kernel_base_type, num_particles, step_size,),
-        #     ax_limits=ax_limits, opt='SVGD', kernel_base_type=kernel_base_type, num_particles=num_particles, eps=step_size,)
+        # Make movie
+        create_movie_2D_slices(p_hist, model.log_prob, to_numpy=True, save_path='./figures/svgd_{}_bhm_remind3d_np_{}_eps_{}.mp4'.format(kernel_base_type, num_particles, step_size,),
+            ax_limits=ax_limits, opt='SVGD', kernel_base_type=kernel_base_type, num_particles=num_particles, eps=step_size,)
 
 
 def test_brain_2D():
