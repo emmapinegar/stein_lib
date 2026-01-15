@@ -8,7 +8,7 @@ import pandas as pd
 import torch as pt
 import matplotlib.pyplot as pl
 from pathlib import Path
-from Bayesian_Hilbert_Maps.bhmlib.BHM.pytorch.bhmtorch_cpu import BHM3D_PYTORCH, BHM2D_PYTORCH
+from Bayesian_Hilbert_Maps.bhmlib.BHM.pytorch.bhm_pytorch import BHM_PYTORCH
 
 
 
@@ -229,11 +229,11 @@ def make_map_3D():
         parameters = \
             {'remind': \
                 ( os.path.abspath('./remind_001_obstacles.txt'),
-                (4, 4, 8), #hinge point resolution
+                (6, 6, 6), #hinge point resolution
                 (-80, 80, -80, 80, -80, 80), #area [min1, max1, min2, max2]
                 2,
                 None,
-                0.1, #gamma
+                0.2, #gamma
                 ),
 
             }
@@ -242,23 +242,26 @@ def make_map_3D():
 
     base_path =  Path(__file__).resolve().parents[2]
 
-    # Settings
-    # dtype = pt.float32
-    device = pt.device("cpu")
-    # pt.set_default_dtype(pt.FloatTensor)
+
     pt.set_default_dtype(pt.float64)
-    # dataset =  'kitti1'
+
     dataset = 'remind'
     save_path = Path("./Bayesian_Hilbert_Maps/bhmlib/Outputs/saved_models/")   # an be None
     save_iter = 25
-    plot_iter = 15
-    #device = pt.device("cuda:0") # Uncomment this to run on GPU
+    plot_iter = 1
+    q_resolution = 1
+    # colormap = 'inferno'
+    print(pt.cuda.is_available())
+    if (pt.cuda.is_available()):
+        print("cuda is available!!")
+        device = pt.device("cuda:0") 
+    else:
+        print("cuda is NOT available!!")
+        device = pt.device("cpu")
 
     # Read the file
     (fn_train, cell_resolution, cell_max_min, skip, thresh, gamma,) = load_parameters(dataset)
 
-    #read data
-    # g = pd.read_csv(fn_train, delimiter=',').values
 
     transform = np.loadtxt(fn_train, max_rows=4)
 
@@ -267,15 +270,8 @@ def make_map_3D():
     obspoints = np.concatenate((obspoints, np.ones((1,np.shape(obspoints)[1]))))
 
     limits = np.array([[0,0,0,1], [obspoints[0,0], 0, 0, 1], [obspoints[0,0], obspoints[1,0], 0, 1], [obspoints[0,0], 0, obspoints[2,0], 1], [0, obspoints[1,0], 0, 1], [0, obspoints[1,0], obspoints[2,0], 1], [0, 0, obspoints[2,0], 1], [obspoints[0,0], obspoints[1,0], obspoints[2,0], 1]])
-    print(limits)
     obspoints = obspoints[:,1:]
     obspoints = np.matmul(transform, obspoints)
-
-    # min_voxel = np.matmul(transform, np.transpose(limits))
-    # print(min_voxel)
-    # print(min_voxel[0,:])
-    # cell_max_min = (np.min(min_voxel[0,:]), np.max(min_voxel[0,:]), np.min(min_voxel[1,:]), np.max(min_voxel[1,:]), np.min(min_voxel[2,:]), np.max(min_voxel[2,:]))
-    # cell_max_min = (np.min(obspoints[0,:]) - 5, np.max(obspoints[0,:]) + 5, np.min(obspoints[1,:]) - 5, np.max(obspoints[1,:]) + 5, np.min(obspoints[2,:]) - 5, np.max(obspoints[2,:]) + 5)
 
 
     obsarr = np.load('./../steerable-needle-planner/scripts/envs/ReMIND_obstacles_001.npy')
@@ -284,10 +280,10 @@ def make_map_3D():
 
     obs_inds = np.where(obsarr == 1)
     free_inds = np.where(obsarr == 0)
-    # print(np.shape(obs_inds))
+
     obspoints = np.concatenate((obs_inds, np.ones((1,np.shape(obs_inds)[1]))))
     freepoints = np.concatenate((free_inds, np.ones((1,np.shape(free_inds)[1]))))
-    # print(np.shape(obspoints))
+
     obspoints = np.matmul(transform, obspoints)
     freepoints = np.matmul(transform, freepoints)
     hinge_point_buffer = -cell_resolution[0]//2
@@ -295,27 +291,15 @@ def make_map_3D():
     freepoints[3,:] = 0
 
     limit_inds = np.where(np.logical_and(np.logical_and(obspoints[2,:] >= cell_max_min[4] - 5, obspoints[2,:] < cell_max_min[5] + 5),np.logical_and(np.logical_and(obspoints[1,:] >= cell_max_min[2] - 5, obspoints[1,:] < cell_max_min[3] + 5),np.logical_and(obspoints[0,:] >= cell_max_min[0] - 5, obspoints[0,:] < cell_max_min[1] + 5))))
-    print(limit_inds)
     limit_inds = limit_inds[0].reshape(-1,)
-    print(f"before: {np.shape(obspoints)} after: {np.shape(limit_inds)}")
     obspoints = obspoints[:,limit_inds]
-    print(f"x min: {np.min(obspoints[0,:])} max: {np.max(obspoints[0,:])} x min: {np.min(obspoints[1,:])} max: {np.max(obspoints[1,:])} z min: {np.min(obspoints[2,:])} max: {np.max(obspoints[2,:])} ")
+    print(f"x min: {np.min(obspoints[0,:]):.04f} max: {np.max(obspoints[0,:]):.04f} x min: {np.min(obspoints[1,:]):.04f} max: {np.max(obspoints[1,:]):.04f} z min: {np.min(obspoints[2,:]):.04f} max: {np.max(obspoints[2,:]):.04f} ")
 
     points = np.concatenate((np.transpose(obspoints), np.transpose(freepoints)))
-    print(np.shape(points))
-    # shuffle_inds = np.arange(np.shape(points)[0])
-    # np.random.shuffle(shuffle_inds)
-    # print(shuffle_inds)
-    # print(np.shape(shuffle_inds))
-    # points = points[shuffle_inds, :]
-    # print(np.shape(points))
+    print(f"points: {np.shape(points)} limits: {cell_max_min}")
 
-    print(cell_max_min)
     g = points
-
-
-    print('shapes:', np.shape(g))
-    g = pt.tensor(g)
+    g = pt.tensor(g, device=device)
     X_train = g[:, 0:3]
     Y_train = g[:, 3].reshape(-1, 1)
 
@@ -325,113 +309,49 @@ def make_map_3D():
     print(max_t)
     print(skip)
     ith_scan = 0
-    ith_scan_indx = np.logical_and(X_train[:,2] >= ith_scan + min_t, X_train[:,2] < ith_scan + min_t + skip)
+    ith_scan_indx = pt.logical_and(X_train[:,2] >= ith_scan + min_t, X_train[:,2] < ith_scan + min_t + skip)
     X = X_train[ith_scan_indx, :]
 
-    bhm_mdl = BHM3D_PYTORCH(gamma=gamma,grid=None,cell_resolution=cell_resolution,cell_max_min=cell_max_min, X=X, nIter=1,)
-    bhm_mdl.load("./Bayesian_Hilbert_Maps/bhmlib/Outputs/saved_models/" + 'bhm_remind_res1_iter114.pt')
+    bhm_mdl = BHM_PYTORCH(gamma=gamma, grid=None, cell_resolution=cell_resolution, X=pt.tensor(np.transpose(freepoints), device=device), nIter=4, device=device) # cell_max_min=cell_max_min,
+    # bhm_mdl.load("./Bayesian_Hilbert_Maps/bhmlib/Outputs/saved_models/" + 'bhm_remind_res1_iter114.pt')
 
-    # for ith_scan in range(0, max_t, skip):
+    for ith_scan in range(0, max_t, skip):
 
-    #     # extract data points of the ith scan
-    #     # ith_scan_indx = X_train[:, 0] == ith_scan
-    #     ith_scan_indx = np.logical_and(X_train[:,2] >= ith_scan + min_t, X_train[:,2] < ith_scan + min_t + skip)
-    #     print_str = f"{ith_scan}th scan: N={pt.sum(ith_scan_indx)}"
-    #     # ith_scan_indx = np.where(np.logical_and(X_train[:,2] >= ith_scan + min_t, X_train[:,2] < ith_scan + min_t + skip))
-    #     X_new = X_train[ith_scan_indx, :]
-    #     y_new = Y_train[ith_scan_indx]
+        # extract data points of the ith scan
+        # ith_scan_indx = X_train[:, 0] == ith_scan
+        ith_scan_indx = pt.logical_and(X_train[:,2] >= ith_scan + min_t, X_train[:,2] < ith_scan + min_t + skip)
+        print_str = f"{ith_scan}th scan: N={pt.sum(ith_scan_indx)}"
+        # ith_scan_indx = np.where(np.logical_and(X_train[:,2] >= ith_scan + min_t, X_train[:,2] < ith_scan + min_t + skip))
+        X_new = X_train[ith_scan_indx, :]
+        y_new = Y_train[ith_scan_indx]
 
-    #     X, y = X_new, y_new
-    #     if ith_scan == 0:
-    #         # get all data for the first scan and initialize the model
-    #         X, y = X_new, y_new
-    #         bhm_mdl = BHM3D_PYTORCH(
-    #             gamma=gamma,
-    #             grid=None,
-    #             cell_resolution=cell_resolution,
-    #             cell_max_min=cell_max_min,
-    #             X=X,
-    #             nIter=1,
-    #         )
-    #     # else:
-    #     #     # information filtering
-    #     #     q_new = bhm_mdl.predict(X_new).reshape(-1, 1)
-    #     #     print(q_new)
-    #     #     print(y_new)
-    #     #     print(pt.absolute(q_new - y_new))
-    #     #     info_val_indx = pt.absolute(q_new - y_new) > thresh
-    #     #     info_val_indx = info_val_indx.flatten()
-    #     #     X, y = X_new[info_val_indx, :], y_new[info_val_indx]
-    #     #     print_str += f" {X.shape[0]/X_new.shape[0]*100:.2f}% points were used"
+        X, y = X_new, y_new
 
-    #     print(print_str)
+        print(print_str)
 
-    #     # Fit the model
-    #     t1 = time.time()
-    #     bhm_mdl.fit(X, y)
-    #     t2 = time.time()
+        # Fit the model
+        t1 = time.time()
+        bhm_mdl.fit(X, y)
+        t2 = time.time()
 
-    #     q_resolution = 2
-    #     if ith_scan % plot_iter == 0:
-    #         # query the model
-    #         # xx, yy, zz= np.meshgrid(np.arange(cell_max_min[0], cell_max_min[1] - 1, q_resolution),
-    #         #                      np.arange(cell_max_min[2], cell_max_min[3] - 1, q_resolution),
-    #         #                      np.arange(ith_scan + min_t + skip//2, ith_scan + min_t + skip//2 +1, q_resolution))
-    #         # grid = np.hstack((xx.ravel()[:, np.newaxis], yy.ravel()[:, np.newaxis], zz.ravel()[:, np.newaxis]))
-    #         # Xq = pt.tensor(grid)
-    #         # # Predict
-    #         # t3 = time.time()
-    #         # yq = bhm_mdl.predict(Xq)
-    #         # t4 = time.time()
+        if save_path is not None and ith_scan % save_iter == 0:
+            print('Saving map...')
+            filename = 'bhm_{}_test_res{}_iter{:03d}.pt'.format(dataset, q_resolution, ith_scan)
+            bhm_mdl.save(save_path, filename)
 
-    #         ones_ = np.where(np.logical_and(X[:,2] >= ith_scan + min_t + skip//2, X[:,2] < ith_scan + min_t + skip//2 + 1))
-    #         print(np.shape(ones_))        
-    #         Xq = X[ones_[0],:]
-    #         yq = bhm_mdl.predict(Xq)
-    #         yq = yq.cpu().numpy()
-    #         y_diff = y[ones_].reshape(-1,) - yq.reshape(-1,)
-    #         # print(f"Fit time: {t2 - t1:.2f} Pred time: {t4 - t3:.2f} iter time: {t4 - t1:.2f} \tPlotting...\n")
+        if ith_scan % plot_iter == 0:
+            plot_bhm_slice(X, y, X_train, Y_train, bhm_mdl, cell_max_min, ith_scan, q_resolution, dataset, save_path, device)
 
-    #         Xq = Xq.cpu().numpy()
+    if save_path is not None :
+        print('Saving map...')
+        filename = 'bhm_{}_test_res{}_iter{:03d}.pt'.format(dataset, q_resolution, ith_scan)
+        bhm_mdl.save(save_path, filename) 
 
-    #         pl.figure(figsize=(18,5))
-    #         pl.subplot(131)
+    old_scan_max = ith_scan + 1
 
-    #         # ones_ = np.where(y ==1)
-    #         # pl.scatter(X[ones_, 0], X[ones_, 1], c='r', cmap='jet', s=5, edgecolors='')
-    #         pl.scatter(X[ones_, 0], X[ones_, 1], c=y[ones_], cmap='jet', s=5, vmin=0, vmax=1)
-    #         pl.axis('equal')
-    #         pl.title('Laser hit points at t={}'.format(np.unique(ith_scan + min_t + skip//2)))
-    #         pl.xlim([cell_max_min[0], cell_max_min[1]]); pl.ylim([cell_max_min[2], cell_max_min[3]])
-    #         pl.subplot(132)
-    #         pl.title('SBHM at t={}'.format(np.unique(ith_scan + min_t + skip//2)))
-    #         # pl.scatter(Xq[:, 0], Xq[:, 1], c=yq, cmap='jet', s=10, marker='8',edgecolors='')
-    #         pl.scatter(Xq[:, 0], Xq[:, 1], c=yq, cmap='jet', s=5, vmin=0, vmax=1)
-
-    #         pl.colorbar()
-    #         pl.xlim([cell_max_min[0], cell_max_min[1]]); pl.ylim([cell_max_min[2], cell_max_min[3]])
-
-    #         pl.subplot(133)
-    #         pl.scatter(Xq[:, 0], Xq[:, 1], c=y_diff, cmap='jet', s=5, vmin=-1, vmax=1)
-    #         pl.colorbar()
-    #         pl.xlim([cell_max_min[0], cell_max_min[1]]); pl.ylim([cell_max_min[2], cell_max_min[3]])
-    #         pl.savefig(os.path.abspath('./Bayesian_Hilbert_Maps/bhmlib/Outputs/images/remind_test_{:03d}.png'.format(ith_scan)), bbox_inches='tight')
-    #         pl.close()
-
-    #     if save_path is not None and \
-    #     ith_scan % save_iter == 0:
-    #         print('Saving map...')
-    #         filename = 'bhm_{}_test_res{}_iter{:03d}.pt'.format(dataset, q_resolution, ith_scan)
-    #         bhm_mdl.save(save_path, filename)
-
-
-    # shuffle_inds = np.random.shuffle(np.arange(np.shape(points)[0]))
     points_ = np.transpose(obspoints)
-    # points = points[shuffle_inds, :]
-
-    
     g = points_
-    g = pt.tensor(g)
+    g = pt.tensor(g, device=device)
     X_train_ = g[:, 0:3]
     Y_train_ = g[:, 3].reshape(-1, 1)
     max_t = np.shape(points_)[0]
@@ -450,27 +370,6 @@ def make_map_3D():
         y_new = Y_train_[ith_scan*skip:(ith_scan+1)*skip]
 
         X, y = X_new, y_new
-        # if ith_scan == 0:
-        #     # get all data for the first scan and initialize the model
-        #     X, y = X_new, y_new
-        #     bhm_mdl = BHM3D_PYTORCH(
-        #         gamma=gamma,
-        #         grid=None,
-        #         cell_resolution=cell_resolution,
-        #         cell_max_min=cell_max_min,
-        #         X=X,
-        #         nIter=1,
-        #     )
-        # else:
-        #     # information filtering
-        #     q_new = bhm_mdl.predict(X_new).reshape(-1, 1)
-        #     print(q_new)
-        #     print(y_new)
-        #     print(pt.absolute(q_new - y_new))
-        #     info_val_indx = pt.absolute(q_new - y_new) > thresh
-        #     info_val_indx = info_val_indx.flatten()
-        #     X, y = X_new[info_val_indx, :], y_new[info_val_indx]
-        #     print_str += f" {X.shape[0]/X_new.shape[0]*100:.2f}% points were used"
 
         print(print_str)
 
@@ -479,65 +378,14 @@ def make_map_3D():
         bhm_mdl.fit(X, y)
         t2 = time.time()
 
-        q_resolution = 1
-        if save_path is not None and \
-        ith_scan % save_iter == 0:
+        if save_path is not None and ith_scan % save_iter == 0:
             print('Saving map...')
-            filename = 'bhm_{}_test_res{}_iter{:03d}.pt'.format(dataset, q_resolution, ith_scan+114)
+            filename = 'bhm_{}_test_res{}_iter{:03d}.pt'.format(dataset, q_resolution, ith_scan+old_scan_max)
             bhm_mdl.save(save_path, filename)  
 
         
         if ith_scan % plot_iter == 0:
-            # query the model
-            # xx, yy, zz= np.meshgrid(np.arange(cell_max_min[0], cell_max_min[1] - 1, q_resolution),
-            #                      np.arange(cell_max_min[2], cell_max_min[3] - 1, q_resolution),
-            #                      np.arange(ith_scan + min_t + skip//2, ith_scan + min_t + skip//2 +1, q_resolution))
-            # grid = np.hstack((xx.ravel()[:, np.newaxis], yy.ravel()[:, np.newaxis], zz.ravel()[:, np.newaxis]))
-            # Xq = pt.tensor(grid)
-            # # Predict
-            # t3 = time.time()
-            # yq = bhm_mdl.predict(Xq)
-            # t4 = time.time()
-            avg_z = np.average(X[:,2].detach().cpu().numpy())
-            print(avg_z)
-            ith_scan_indx_ = np.logical_and(X_train[:,2] >= avg_z , X_train[:,2] < avg_z + 2)
-
-            X = X_train[ith_scan_indx_, :]
-            y = Y_train[ith_scan_indx_]
-            ones_ = np.where(np.logical_and(X[:,2] >= avg_z, X[:,2] < avg_z + 1))
-            print(np.shape(ones_)) 
-            if np.shape(ones_)[1]:       
-                Xq = X[ones_[0],:]
-                yq = bhm_mdl.predict(Xq)
-                yq = yq.cpu().numpy()
-                y_diff = y[ones_].reshape(-1,) - yq.reshape(-1,)
-                # print(f"Fit time: {t2 - t1:.2f} Pred time: {t4 - t3:.2f} iter time: {t4 - t1:.2f} \tPlotting...\n")
-
-                Xq = Xq.cpu().numpy()
-
-                pl.figure(figsize=(18,5))
-                pl.subplot(131)
-
-                # ones_ = np.where(y ==1)
-                # pl.scatter(X[ones_, 0], X[ones_, 1], c='r', cmap='jet', s=5, edgecolors='')
-                pl.scatter(X[ones_, 0], X[ones_, 1], c=y[ones_], cmap='jet', s=5, vmin=0, vmax=1)
-                pl.axis('equal')
-                pl.title('Laser hit points at t={}'.format(avg_z))
-                pl.xlim([cell_max_min[0], cell_max_min[1]]); pl.ylim([cell_max_min[2], cell_max_min[3]])
-                pl.subplot(132)
-                pl.title('SBHM at t={}'.format(avg_z))
-                # pl.scatter(Xq[:, 0], Xq[:, 1], c=yq, cmap='jet', s=10, marker='8',edgecolors='')
-                pl.scatter(Xq[:, 0], Xq[:, 1], c=yq, cmap='jet', s=5, vmin=0, vmax=1)
-
-                pl.colorbar()
-                pl.xlim([cell_max_min[0], cell_max_min[1]]); pl.ylim([cell_max_min[2], cell_max_min[3]])
-
-                pl.subplot(133)
-                pl.scatter(Xq[:, 0], Xq[:, 1], c=y_diff, cmap='jet', s=5, vmin=-1, vmax=1)
-                pl.colorbar()
-                pl.xlim([cell_max_min[0], cell_max_min[1]]); pl.ylim([cell_max_min[2], cell_max_min[3]])
-                pl.savefig(os.path.abspath('./Bayesian_Hilbert_Maps/bhmlib/Outputs/images/remind_test_{:03d}.png'.format(ith_scan)), bbox_inches='tight')
-                pl.close()
+            plot_bhm_slice(X, y, X_train, Y_train, bhm_mdl, cell_max_min, ith_scan+old_scan_max, q_resolution, dataset, save_path, device)
 
           
 
@@ -545,6 +393,61 @@ def make_map_3D():
         print('Saving map...')
         filename = 'bhm_{}_test_res{}_final.pt'.format(dataset, q_resolution)
         bhm_mdl.save(save_path, filename) 
+
+
+
+def plot_bhm_slice(X, y, X_train, Y_train, bhm_mdl, cell_max_min, plot_index, q_resolution, dataset, save_path, device, colormap='plasma'):
+    avg_z = pt.mean(X[:,2])
+    print(f"Plotting bhm at z = {avg_z}")
+    ith_scan_indx_ = pt.logical_and(X_train[:,2] >= avg_z , X_train[:,2] < avg_z + 1)
+    X = X_train[ith_scan_indx_, :]
+    y = Y_train[ith_scan_indx_]
+    plot_train_points = False
+    avg_z = avg_z.cpu().numpy()
+    if plot_train_points:
+        Xq = X_train[ith_scan_indx_, :]
+    else:
+        # query the model
+        buffer = 6
+        xx, yy, zz= np.meshgrid(np.arange(cell_max_min[0]-buffer, cell_max_min[1]+buffer, q_resolution),
+                             np.arange(cell_max_min[2]-buffer, cell_max_min[3]+buffer, q_resolution),
+                             np.arange(avg_z, avg_z+1, q_resolution))
+        grid = np.hstack((xx.ravel()[:, np.newaxis], yy.ravel()[:, np.newaxis], zz.ravel()[:, np.newaxis]))
+        Xq = pt.tensor(grid, device=device)
+    # Predict
+    t3 = time.time()
+    yq = bhm_mdl.predict(Xq)
+    t4 = time.time()
+
+    Xq = Xq.cpu().numpy()
+    yq = yq.cpu().numpy()
+    X = X.cpu().numpy()
+    y = y.cpu().numpy()
+    # y_diff = y.reshape(-1,) - yq.reshape(-1,)
+    # print(f"Fit time: {t2 - t1:.2f} Pred time: {t4 - t3:.2f} iter time: {t4 - t1:.2f} \tPlotting...\n")
+
+    pl.figure(figsize=(18,5))
+    pl.subplot(131)
+    pl.scatter(X[:, 0], X[:, 1], c=y[:], cmap=colormap, s=5, vmin=0, vmax=1)
+    pl.axis('equal')
+    pl.title('Laser hit points at t={}'.format(avg_z))
+    pl.colorbar()
+    pl.xlim([cell_max_min[0]-2, cell_max_min[1]+2]); pl.ylim([cell_max_min[2]-2, cell_max_min[3]+2])
+    
+    pl.subplot(132)
+    pl.title('SBHM at t={}'.format(avg_z))
+    pl.scatter(Xq[:, 0], Xq[:, 1], c=yq, cmap=colormap, s=5, vmin=0, vmax=1)
+    pl.axis('equal')
+    pl.colorbar()
+    pl.xlim([cell_max_min[0]-2, cell_max_min[1]+2]); pl.ylim([cell_max_min[2]-2, cell_max_min[3]+2])
+
+    # pl.subplot(133)
+    # pl.scatter(Xq[:, 0], Xq[:, 1], c=y_diff, cmap=colormap, s=5, vmin=-1, vmax=1)
+    # pl.colorbar()
+    # pl.xlim([cell_max_min[0], cell_max_min[1]]); pl.ylim([cell_max_min[2], cell_max_min[3]])
+
+    pl.savefig(os.path.abspath('./Bayesian_Hilbert_Maps/bhmlib/Outputs/images/remind_test_{:03d}.png'.format(plot_index)), bbox_inches='tight')
+    pl.close()
 
 
 if __name__=='__main__':
