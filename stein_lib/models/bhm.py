@@ -24,30 +24,28 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 import numpy as np
 import torch
 from pathlib import Path
-from Bayesian_Hilbert_Maps.bhmlib.BHM.pytorch.bhmtorch_cpu import BHM2D_PYTORCH, BHM3D_PYTORCH
+from Bayesian_Hilbert_Maps.bhmlib.BHM.pytorch.bhm_pytorch import BHM_PYTORCH
 
 
 class BayesianHilbertMap:
-    def __init__(
-            self,
-            file_path=None,
-            limits=((-10, 20,), (-25, 5)),
-            dim=2
-    ):
+    def __init__(self, file_path=None, limits=((-10, 20,), (-25, 5)), dim=2, device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")):
 
         # Load trained Bayesian Hilbert Map
         params = torch.load(file_path)
         self.dim = dim
-        if self.dim == 2:
-            self.bhm = BHM2D_PYTORCH(torch_kernel_func=True, **params)
-        else:
-            self.bhm = BHM3D_PYTORCH(torch_kernel_func=True, **params)
-        self.limits = torch.tensor(limits)
+        self.bhm = BHM_PYTORCH(torch_kernel_func=True, device=device, cell_max_min=limits, file=file_path) #, **params)
+        # self.bhm.load(file_path)
+        if limits is not None:
+            self.limits = torch.tensor(limits, device=device)
+        else: 
+            self.limits = limits
 
     def log_prob(self, x):
         log_p = self.bhm.log_prob_vacancy(x)
+
         if self.limits is not None:
             scale = 1.
+            print_str = f"log_p: {log_p[0]:5.6f} "
             log_p -= torch.exp(-scale*(x[:, 0] - self.limits[0, 0]))
             log_p -= torch.exp( scale*(x[:, 0] - self.limits[0, 1]))
             log_p -= torch.exp(-scale*(x[:, 1] - self.limits[1, 0]))
@@ -55,6 +53,12 @@ class BayesianHilbertMap:
             if self.dim == 3:
                 log_p -= torch.exp(-scale*(x[:, 2] - self.limits[2, 0]))
                 log_p -= torch.exp( scale*(x[:, 2] - self.limits[2, 1]))
+            print(f"{print_str} new: {log_p[0]:5.6f} x: {x[0,0] - self.limits[0,0]:5.6f} {x[0,0] - self.limits[0,1]:5.6f} y: {x[0,1] - self.limits[1,0]:5.6f} {x[0,1] - self.limits[1,1]:5.6f} z: {x[0,2] - self.limits[2,0]:5.6f} {x[0,2] - self.limits[2,1]:5.6f}")        
+        else:
+            print(f"log_p: {log_p[0]:5.6f}")
+        #     log_p_mod = log_p - log_diff
+        # else:
+        #     log_p_mod = log_p
         return log_p
 
     def grad_log_p(self, x):

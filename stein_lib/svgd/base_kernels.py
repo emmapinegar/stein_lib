@@ -28,10 +28,7 @@ from abc import ABC, abstractmethod
 
 class BaseKernel(ABC):
 
-    def __init__(
-        self,
-        analytic_grad=True,
-    ):
+    def __init__(self, analytic_grad=True,):
 
         self.analytic_grad = analytic_grad
 
@@ -73,22 +70,12 @@ class RBF(BaseKernel):
     """
         k(x, x') = exp( - || x - x'||**2 / (2 * ell**2))
     """
-    def __init__(
-        self,
-        bandwidth=-1,
-        analytic_grad=True,
-        **kwargs,
-    ):
-        super().__init__(
-            analytic_grad,
-        )
+    def __init__(self, bandwidth=-1, analytic_grad=True, **kwargs,):
+        super().__init__(analytic_grad=analytic_grad,)
         self.ell = bandwidth
         self.analytic_grad = analytic_grad
 
-    def compute_bandwidth(
-            self,
-            X, Y
-    ):
+    def compute_bandwidth(self, X, Y):
         """
             Older version.
         """
@@ -110,6 +97,8 @@ class RBF(BaseKernel):
 
         h = h / np.log(X.shape[0])
 
+
+        print(f"ell: {self.ell} median: {torch.median(pairwise_dists_sq).detach()} h: {h}")
         # Clamp bandwidth
         tol = 1e-5
         if isinstance(h, torch.Tensor):
@@ -119,8 +108,8 @@ class RBF(BaseKernel):
 
         return h, pairwise_dists_sq
 
-    def eval(self, X, Y, M=None, compute_dK_dK_t=False, bw=None, **kwargs,):
 
+    def eval(self, X, Y, M=None, compute_dK_dK_t=False, bw=None, **kwargs,):
         assert X.shape == Y.shape
 
         if self.analytic_grad:
@@ -138,11 +127,7 @@ class RBF(BaseKernel):
         # Used for SVN updates
         dK_dK_t = None
         if compute_dK_dK_t:
-            dK_dK_t = torch.einsum(
-                    'bijk,bilm->bijm',
-                    d_K_Xi.unsqueeze(3),
-                    d_K_Xi.unsqueeze(2),
-                )
+            dK_dK_t = torch.einsum('bijk,bilm->bijm', d_K_Xi.unsqueeze(3), d_K_Xi.unsqueeze(2),)
         return (K, d_K_Xi, dK_dK_t, pw_dists_sq,)
 
 
@@ -235,9 +220,10 @@ class RBF_Anisotropic(RBF):
         k(x, x') = exp( - (x - y) M (x - y)^T / (2 * d))
     """
     def __init__(self, hessian_scale=1, analytic_grad=True, median_heuristic=False, **kwargs,):
-        super().__init__(analytic_grad,)
+        super().__init__(analytic_grad=analytic_grad,**kwargs)
         self.hessian_scale = hessian_scale
         self.median_heuristic = median_heuristic
+        # print(kwargs)
 
 
     def eval(self,X, Y,M=None, compute_dK_dK_t=False, bw=None, **kwargs,):
@@ -261,12 +247,12 @@ class RBF_Anisotropic(RBF):
                 bandwidth, pw_dists_sq = self.compute_bandwidth(X, Y)
             else:
                 # bandwidth = self.hessian_scale * X.shape[1]
-                bandwidth = self.hessian_scale
+                bandwidth = self.hessian_scale * self.ell
                 pw_dists_sq = -2 * X_M_Yt + X_M_Xt.diag().unsqueeze(1) + Y_M_Yt.diag().unsqueeze(0)
 
             if bw is not None:
                 bandwidth = bw
-
+            print(f"bandwidth: {bandwidth} ell: {self.ell}")
             K = (- pw_dists_sq / bandwidth).exp()
             d_K_Xi = K.unsqueeze(2) * ( (X.unsqueeze(1) - Y) @ M ) * 2 / bandwidth
         else:
@@ -275,11 +261,7 @@ class RBF_Anisotropic(RBF):
         # Used for SVN updates
         dK_dK_t = None
         if compute_dK_dK_t:
-            dK_dK_t = torch.einsum(
-                    'bijk,bilm->bijm',
-                    d_K_Xi.unsqueeze(3),
-                    d_K_Xi.unsqueeze(2),
-                )
+            dK_dK_t = torch.einsum('bijk,bilm->bijm', d_K_Xi.unsqueeze(3), d_K_Xi.unsqueeze(2),)
         return (K, d_K_Xi, dK_dK_t, pw_dists_sq,)
 
 

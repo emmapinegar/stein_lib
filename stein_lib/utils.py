@@ -29,13 +29,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.animation as animation
 
-num_levels = 15
+num_levels = 20
 slice_buffer = 5
 
-def get_jacobian(
-        gradient,
-        X,
-):
+def get_jacobian(gradient, X,):
     """
     Returns the Jacobian matrix, given the gradient
     Parameters
@@ -49,13 +46,7 @@ def get_jacobian(
     J : (Tensor)
         Jacobian, of shape [dim, dim, batch]
     """
-    dg_dXi = [
-        torch.autograd.grad(
-            gradient[:, i].sum(),
-            X,
-            retain_graph=True,
-        )[0] for i in range(gradient.shape[1])
-    ]
+    dg_dXi = [torch.autograd.grad(gradient[:, i].sum(), X, retain_graph=True,)[0] for i in range(gradient.shape[1])]
     J = torch.stack(dg_dXi, dim=1)
     return J
 
@@ -258,11 +249,13 @@ def plot_graph_2D_slices(particles, log_prob, save_path='/tmp/graph.png', to_num
             C = np.exp(c).reshape(ngrid, ngrid)
         else:
             C = np.exp(log_prob(grid)).reshape(ngrid, ngrid)
-
-        plt.contourf(X[slice_ind].reshape(ngrid, ngrid), Y[slice_ind].reshape(ngrid, ngrid), C, num_levels)
+        plt.scatter(X[slice_ind], Y[slice_ind], c=C, s=1.5)
+        # plt.contourf(X[slice_ind].reshape(ngrid, ngrid), Y[slice_ind].reshape(ngrid, ngrid), C, num_levels, vmax=1, vmin=0)
         # xlim = ax_limits[0]
         # ylim = ax_limits[1]
         plt.plot(slice_particles[slice_ind][:, 0], slice_particles[slice_ind][:, 1], 'ro', markersize=3)
+        plt.axis('equal')
+        plt.colorbar()
 
         # ax.set_xlim(xlim)
         # ax.set_ylim(ylim)
@@ -270,6 +263,91 @@ def plot_graph_2D_slices(particles, log_prob, save_path='/tmp/graph.png', to_num
     plt.savefig(save_path)
     plt.close()    
 
+
+def plot_graph_2D_gradient_slices(particles, log_prob, grad_log_prob, phi, save_path='/tmp/graph.png', to_numpy=False, ax_limits=[[-4,4],[4,4]],):
+
+    if to_numpy:
+        particles = particles.detach().cpu().numpy()
+
+    fig = plt.figure(figsize=(15,5))
+    # ax = plt.gca()
+
+    ngrid = 50
+    X = []
+    Y = []
+    Z = []
+    # C = []
+    slice_grids = []
+    slice_particles = []
+
+    # slice 1, xy plane
+    x1 = np.linspace(ax_limits[0][0], ax_limits[0][1], ngrid)
+    y1 = np.linspace(ax_limits[1][0], ax_limits[1][1], ngrid)
+    z1 = np.array([(ax_limits[2][1] - ax_limits[2][0])//2 + ax_limits[2][0]])
+    X1, Y1, Z1 = np.meshgrid(x1,y1,z1)
+    X += [X1]; Y+= [Y1]; Z += [Z1]
+    slice_grids += [np.vstack((np.ndarray.flatten(X1), np.ndarray.flatten(Y1),np.ndarray.flatten(Z1)))]
+    slice_particles += [particles[np.where(np.logical_and(particles[:,2] >= z1[0], particles[:,2] < z1[0] + slice_buffer))[0], :]]      
+
+    # slice 2, xz plane
+    z2 = np.linspace(ax_limits[2][0], ax_limits[2][1], ngrid)
+    y2 = np.array([(ax_limits[1][1] - ax_limits[1][0])//2 + ax_limits[1][0]])
+    X2, Y2, Z2 = np.meshgrid(x1, y2, z2)
+    X += [X2]; Y+= [Y2]; Z += [Z2]
+    slice_grids += [np.vstack((np.ndarray.flatten(X2), np.ndarray.flatten(Y2),np.ndarray.flatten(Z2)))]
+    slice_particles += [particles[np.where(np.logical_and(particles[:,1] >= y2[0], particles[:,1] < y2[0] + slice_buffer))[0], :]] 
+
+    # slice 3, yz plane
+    x3 = np.array([(ax_limits[0][1] - ax_limits[0][0])//2 + ax_limits[0][0]])
+    X3, Y3, Z3 = np.meshgrid(x3, y1, z2)
+    X += [X3]; Y+= [Y3]; Z += [Z3]
+    slice_grids += [np.vstack((np.ndarray.flatten(X3), np.ndarray.flatten(Y3),np.ndarray.flatten(Z3)))]
+    slice_particles += [particles[np.where(np.logical_and(particles[:,0] >= x3[0], particles[:,0] < x3[0] + slice_buffer))[0], :]] 
+    ax = fig.add_subplot(projection='3d')
+    for slice_ind in range(1): #range(len(X)):
+        
+        # plt.subplot(1,len(X),slice_ind+1)
+        if to_numpy:
+            grid = torch.from_numpy(slice_grids[slice_ind])
+            c = grad_log_prob(grid.t()).cpu().numpy()
+            particles_t = torch.tensor(slice_particles[slice_ind])
+            print(np.shape(slice_grids[slice_ind]))
+            print(particles_t.size())
+            particles_log = log_prob(grid.t())
+            particles_grad = grad_log_prob(particles_t)
+            particles_phi, dists_sq = phi(particles_t, particles_grad, dlog_lh=particles_grad)
+            particles_phi = 500*particles_phi.cpu().numpy()
+            particles_grad = particles_grad.cpu().numpy()
+            particles_log = np.exp(particles_log.cpu().numpy())
+            # C = np.exp(c).reshape(ngrid, ngrid)
+        else:
+            c = grad_log_prob(grid)
+            particles_t = torch.tensor(slice_particles[slice_ind])
+            particles_grad = grad_log_prob(particles_t)
+            particles_phi, dists_sq = phi(particles_t, particles_grad, dlog_lh=particles_grad)            
+            # C = np.exp(grad_log_prob(grid)).reshape(ngrid, ngrid)
+        print(np.shape(c))
+        C = np.linalg.norm(c, axis=1)
+        print(np.shape(C))
+        # plt.scatter(X[slice_ind], Y[slice_ind], c=C, s=1.5)
+        # plt.contour(X[slice_ind].reshape(ngrid, ngrid), Y[slice_ind].reshape(ngrid, ngrid), C.reshape(ngrid,ngrid), num_levels, linewidths=1)
+        # xlim = ax_limits[0]
+        # ylim = ax_limits[1]
+        ax.scatter(slice_grids[slice_ind][0,:], slice_grids[slice_ind][1, :], slice_grids[slice_ind][2, :], s=2, c=particles_log)
+        ax.scatter(slice_particles[slice_ind][:, 0], slice_particles[slice_ind][:, 1], slice_particles[slice_ind][:, 2], s=4, c='r')
+        ax.quiver(slice_particles[slice_ind][:, 0], slice_particles[slice_ind][:, 1], slice_particles[slice_ind][:, 2], particles_phi[:,0], particles_phi[:,1], particles_phi[:,2])
+
+        # plt.plot(slice_particles[slice_ind][:, 0], slice_particles[slice_ind][:, 1], 'ro', markersize=3)
+        # plt.axis('equal')
+        # plt.colorbar()
+
+        # ax.set_xlim(xlim)
+        # ax.set_ylim(ylim)
+    ax.set_xlim(ax_limits[0][0], ax_limits[0][1])
+    ax.set_ylim(ax_limits[1][0], ax_limits[1][1])
+    ax.set_zlim(ax_limits[2][0], ax_limits[2][1])
+    plt.savefig(save_path)
+    plt.show() 
 
 
 def create_movie_2D_slices(particle_hist, log_prob, save_path="/tmp/stein_movie.mp4", ax_limits=[[-4, 4],[4, 4]], to_numpy=False,
@@ -344,15 +422,17 @@ def create_movie_2D_slices(particle_hist, log_prob, save_path="/tmp/stein_movie.
         if to_numpy:
             grid = torch.from_numpy(slice_grids[slice_ind])
             c = log_prob(grid.t()).cpu().numpy()
+            # C = c.reshape(ngrid, ngrid)
             C = np.exp(c).reshape(ngrid, ngrid)
         else:
-            C = np.exp(
-                log_prob(slice_grids[slice_ind]),
-            ).reshape(ngrid, ngrid)
+            C = np.exp(log_prob(slice_grids[slice_ind]),).reshape(ngrid, ngrid)
+            # C = log_prob(slice_grids[slice_ind]).reshape(ngrid, ngrid)
 
-        plt.contourf(X[slice_ind].reshape(ngrid, ngrid), Y[slice_ind].reshape(ngrid, ngrid), C, num_levels)
+        plt.contourf(X[slice_ind].reshape(ngrid, ngrid), Y[slice_ind].reshape(ngrid, ngrid), C, num_levels, vmax=1, vmin=0)
         # xlim = ax_limits[0]
         # ylim = ax_limits[1]
+        plt.axis('equal')
+        # plt.colorbar()
         p_start =  slice_particles[slice_ind][0]
         particles = plt.plot(p_start[:, 0], p_start[:, 1], 'ro', markersize=3)
         plot_particles += [particles]
@@ -376,7 +456,72 @@ def create_movie_2D_slices(particle_hist, log_prob, save_path="/tmp/stein_movie.
             plot_particles[slice_ind][0].set_ydata(pos[:, 1])
         return plot_particles
 
-    ani = animation.FuncAnimation(fig, _animate, frames=n_iter, init_func=_init, interval=100,)
+    ani = animation.FuncAnimation(fig, _animate, frames=n_iter, init_func=_init, interval=200,)
 
     ani.save(save_path)
+    plt.show()
+
+
+def create_movie_3D(particle_hist, log_prob, save_path="/tmp/stein_movie.mp4", ax_limits=[[-4, 4],[4, 4]], to_numpy=False,
+        kernel_base_type=None, opt=None, num_particles=None, eps=None,):
+
+    k_type = kernel_base_type,
+    if kernel_base_type == 'RBF_Anisotropic':
+        k_type = 'RBF_H'
+
+    case_name = '{}-{} (np = {}, eps = {})'.format(opt, k_type, num_particles, eps,)
+
+    fig = plt.figure(figsize=(10,10))
+    # ax = plt.gca()
+    plt.suptitle(case_name + '\n' + str(0) + '$ ^{th}$ iteration')
+
+    ngrid = 100
+
+    X = []
+    Y = []
+    Z = []
+    # C = []
+    slice_grids = []
+    slice_particles = []
+    plot_particles = []
+
+    particle_hist = np.array(particle_hist)
+    # print(np.shape(particle_hist))
+    # print(np.shape(particle_hist)[0])
+    # print(np.shape(particle_hist)[1])
+    # print(np.shape(particle_hist)[2])
+    # print(particle_hist)
+
+    ax = fig.add_subplot(projection='3d')
+    # print(np.shape(particle_hist)[1])
+    opacities = np.linspace(0.2, 1.0, np.shape(particle_hist)[0])
+    for particle_ind in range(np.shape(particle_hist)[1]):
+        # print(np.shape(particle_hist[:,particle_ind,0]))
+        ax.scatter(particle_hist[:,particle_ind,0], particle_hist[:,particle_ind,1], particle_hist[:,particle_ind,2], s=4*opacities,)
+        ax.plot(particle_hist[:,particle_ind,0], particle_hist[:,particle_ind,1], particle_hist[:,particle_ind,2], linewidth=0.5)
+    ax.set_xlim(ax_limits[0][0], ax_limits[0][1])
+    ax.set_ylim(ax_limits[1][0], ax_limits[1][1])
+    ax.set_zlim(ax_limits[2][0], ax_limits[2][1])
+    
+    # def _init():  # only required for blitting to give a clean slate.
+    #     # ax.set_title(str(0) + '$ ^{th}$ iteration')
+    #     plt.suptitle(case_name + '\n' + str(0) + '$ ^{th}$ iteration')
+    #     # plt.xlim(xlim)
+    #     # plt.ylim(ylim)
+    #     return plot_particles
+
+    # def _animate(i):
+    #     # ax.set_title(str(i) + '$ ^{th}$ iteration')
+    #     plt.suptitle(case_name + '\n' + str(i) + '$ ^{th}$ iteration')
+    #     for slice_ind in range(len(X)):
+    #         plt.subplot(1, len(X), slice_ind+1)
+
+    #         pos = slice_particles[slice_ind][i]
+    #         plot_particles[slice_ind][0].set_xdata(pos[:, 0])
+    #         plot_particles[slice_ind][0].set_ydata(pos[:, 1])
+    #     return plot_particles
+
+    # ani = animation.FuncAnimation(fig, _animate, frames=n_iter, init_func=_init, interval=100,)
+
+    # ani.save(save_path)
     plt.show()

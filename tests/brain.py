@@ -28,23 +28,52 @@ from stein_lib.models.gaussian_mixture import mixture_of_gaussians
 from stein_lib.svgd.svgd import SVGD
 from pathlib import Path
 from stein_lib.models.bhm import BayesianHilbertMap
-from stein_lib.utils import create_movie_2D, plot_graph_2D, plot_graph_2D_slices, create_movie_2D_slices
+from stein_lib.utils import create_movie_2D, plot_graph_2D, plot_graph_2D_slices, plot_graph_2D_gradient_slices, create_movie_2D_slices, create_movie_3D
 from stein_lib.prm_utils import get_graph
 
 torch.set_default_dtype(torch.float64)
+device_ =  torch.device("cpu")# torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+torch.set_default_device(device_)
 
 def test_brain_3D():
     ###### Params ######
-    # num_particles = 100
+
     num_particles = 10000
-    # iters = 3000
-    # iters = 200
-    iters = 100
-    # iters = 1
+    iters = 50
+    analytic_grads = False
+
+    median_heuristic = True
+    if median_heuristic:
+        bandwidth = -1.
+    else:
+        bandwidth = 250.
+
+    repulsive_scaling = 2.
+    if analytic_grads:
+        repulsive_scaling = -repulsive_scaling
+    step_size = 1.
+
+    lim_func = True
+
 
     # Sample intial particles
     torch.manual_seed(5432876)
 
+    grad_ax_limits = [[35., 180.],[55., 230.],[30., 140.]]
+    plot_buffer = 5.
+    sample_buffer = 0.5
+    plot_ax_limits = [[0., 0.], [0., 0.], [0., 0.]]
+    for limit_ind in range(len(plot_ax_limits)):
+        plot_ax_limits[limit_ind][0] = grad_ax_limits[limit_ind][0] - plot_buffer
+        plot_ax_limits[limit_ind][1] = grad_ax_limits[limit_ind][1] + plot_buffer 
+
+    low_sample_limits = [grad_ax_limits[0][0] + sample_buffer, grad_ax_limits[1][0] + sample_buffer, grad_ax_limits[2][0] + sample_buffer]
+    high_sample_limits = [grad_ax_limits[0][1] - sample_buffer, grad_ax_limits[1][1] - sample_buffer, grad_ax_limits[2][1] - sample_buffer] 
+
+    # low_sample_limits = [31., 55., 88.]
+    # high_sample_limits = [35., 60., 92.] 
+    print(f"low limits: {low_sample_limits} high limits: {high_sample_limits} buffer: {sample_buffer} {grad_ax_limits[0][0]} test: {grad_ax_limits[0][0] + sample_buffer}")
+    print(f"plot limits: {plot_ax_limits}")
     for i in range(1):
         ## Large Gaussian in center of remind map.
         # prior_dist = Normal(loc=torch.tensor([30.,90.,15.]), scale=torch.tensor([20.,20.,20.]))
@@ -58,7 +87,8 @@ def test_brain_3D():
         # prior_dist = mixture_of_gaussians(num_comp=2, mu_list=[[12.,-3.], [-5, -18] ], sigma_list=radii_list,)
 
         # Uniform distribution
-        prior_dist = Uniform(low=torch.tensor([-30., 20., -40.]), high=torch.tensor([100., 160., 50.]))
+        prior_dist = Uniform(low=torch.tensor(low_sample_limits), high=torch.tensor(high_sample_limits))
+        # prior_dist = Uniform(low=torch.tensor([50., 70., 40.]), high=torch.tensor([170., 220., 130.]))
 
 
         particles_0 = prior_dist.sample((num_particles,))
@@ -66,10 +96,13 @@ def test_brain_3D():
         # Load model
         from Bayesian_Hilbert_Maps import bhmlib
         bhm_path = Path(bhmlib.__path__[0]).resolve()
-        model_file = bhm_path / 'Outputs' / 'saved_models' / 'bhm_remind_test_res1_final.pt'
+        model_file = bhm_path / 'Outputs' / 'saved_models' / 'bhm_remind_test_log_res2.5_iter658.pt'
         # model_file = '/tmp/bhm_intel_res0.25_iter100.pt'
-        ax_limits = [[-45, 112],[5, 167],[-52,59]]
-        model = BayesianHilbertMap(model_file, ax_limits, dim=3)
+
+        if not lim_func:
+            grad_ax_limits = None
+        model = BayesianHilbertMap(model_file, grad_ax_limits, dim=3, device=device_)
+        
 
         #================== SVGD ===========================
         particles = particles_0.clone().cpu().numpy()
@@ -85,10 +118,10 @@ def test_brain_3D():
         kernel_base_type = 'RBF_Anisotropic'
         # optimizer_type = 'SGD'
         optimizer_type = 'Adam'
-        step_size = 0.5
-        # step_size = 0.
-        svgd = SVGD(kernel_base_type=kernel_base_type, kernel_structure=None, median_heuristic=True, repulsive_scaling=0.5,
-            geom_metric_type='fisher', verbose=True, bandwidth=5.,)
+
+
+        svgd = SVGD(kernel_base_type=kernel_base_type, kernel_structure=None, median_heuristic=median_heuristic, repulsive_scaling=repulsive_scaling,
+            geom_metric_type='fisher', verbose=True, bandwidth=bandwidth,)
 
 
         # kernel_base_type = 'RBF_Anisotropic'
@@ -98,7 +131,7 @@ def test_brain_3D():
         #     geom_metric_type='fisher', verbose=True, bandwidth=5.,)
 
         ## Optimize
-        (particles, p_hist, pw_dists, pw_dists_scaled) = svgd.apply(particles, model, iters, step_size, use_analytic_grads=False, optimizer_type=optimizer_type,)
+        (particles, p_hist, pw_dists, pw_dists_scaled) = svgd.apply(particles, model, iters, step_size, use_analytic_grads=analytic_grads, optimizer_type=optimizer_type,)
 
         print("\nMean Est.: ", particles.mean(0))
         print("Std Est.: ", particles.std(0))
@@ -106,17 +139,34 @@ def test_brain_3D():
         #=============================================
 
         particles_ = particles.detach().numpy()
-        old_particles = np.loadtxt("./remind_001_samples.txt")
+        # old_particles = np.loadtxt("./remind_001_samples.txt")
 
+        image_name = f"./figures/{optimizer_type}_{kernel_base_type}_np_{num_particles}_iters_{iters}_eps_{step_size}_repulsive_{repulsive_scaling}_bw_{bandwidth}_limfunc_{lim_func}_analytic_{analytic_grads}_grad.png" 
+        video_name = f"./figures/{optimizer_type}_{kernel_base_type}_np_{num_particles}_iters_{iters}_eps_{step_size}_repulsive_{repulsive_scaling}_bw_{bandwidth}_limfunc_{lim_func}_analytic_{analytic_grads}.mp4"
         # particles_ = np.vstack((old_particles[:,0:3], particles_))
         # np.savetxt("./remind_001_samples.txt", particles_, fmt='%9f ')
 
-        plot_graph_2D_slices(particles.detach(), model.log_prob, ax_limits=ax_limits, to_numpy=True,
-            save_path='./figures/graph_svgd_{}_bhm_remind3d_np_{}_eps_{}.png'.format(kernel_base_type, num_particles, step_size,),)    
+        # plot_graph_2D_slices(particles.detach(), model.log_prob, ax_limits=plot_ax_limits, to_numpy=True,
+        #     save_path='./figures/svgd_{}_bhm_remind3d_np_{}_eps_{}.png'.format(kernel_base_type, num_particles, step_size,),) 
+        # grad_func = model.grad_log_p
+        # if not analytic_grads:
+        #     def grad_func(X):
+        #         # Numerical Gradients
+        #         log_p = model.log_prob(X).unsqueeze(1)
+        #         dlog_p = torch.autograd.grad(log_p.sum(), X, create_graph=True,)[0]
+        #         return dlog_p
+            
+
+        # plot_graph_2D_gradient_slices(particles.detach(), model.log_prob, grad_func, svgd.phi, ax_limits=plot_ax_limits, to_numpy=True,
+        #     save_path=image_name,) 
 
         # Make movie
-        create_movie_2D_slices(p_hist, model.log_prob, to_numpy=True, save_path='./figures/svgd_{}_bhm_remind3d_np_{}_eps_{}.mp4'.format(kernel_base_type, num_particles, step_size,),
-            ax_limits=ax_limits, opt='SVGD', kernel_base_type=kernel_base_type, num_particles=num_particles, eps=step_size,)
+        create_movie_2D_slices(p_hist, model.log_prob, to_numpy=True, save_path=video_name,
+            ax_limits=plot_ax_limits, opt='SVGD', kernel_base_type=kernel_base_type, num_particles=num_particles, eps=step_size,)
+        
+        # Make movie
+        create_movie_3D(p_hist, model.log_prob, to_numpy=True, save_path=video_name,
+            ax_limits=plot_ax_limits, opt='SVGD', kernel_base_type=kernel_base_type, num_particles=num_particles, eps=step_size,)
 
 
 def test_brain_2D():
