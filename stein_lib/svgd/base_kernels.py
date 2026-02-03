@@ -28,10 +28,7 @@ from abc import ABC, abstractmethod
 
 class BaseKernel(ABC):
 
-    def __init__(
-        self,
-        analytic_grad=True,
-    ):
+    def __init__(self, analytic_grad=True,):
 
         self.analytic_grad = analytic_grad
 
@@ -73,24 +70,13 @@ class RBF(BaseKernel):
     """
         k(x, x') = exp( - || x - x'||**2 / (2 * ell**2))
     """
-    def __init__(
-        self,
-        bandwidth=-1,
-        analytic_grad=True,
-        median_heuristic=False,
-        **kwargs,
-    ):
-        super().__init__(
-            analytic_grad,
-        )
+    def __init__(self, bandwidth=-1, analytic_grad=True, median_heuristic=False, **kwargs,):
+        super().__init__(analytic_grad,)
         self.bandwidth = bandwidth
         self.median_heuristic = median_heuristic
         self.analytic_grad = analytic_grad
 
-    def compute_bandwidth(
-            self,
-            pairwise_dists_sq,
-    ):
+    def compute_bandwidth(self, pairwise_dists_sq,):
         """
             Older version.
         """
@@ -116,14 +102,7 @@ class RBF(BaseKernel):
 
         return h
 
-    def eval(
-            self,
-            X, Y,
-            M=None,
-            compute_dK_dK_t=False,
-            bw=None,
-            **kwargs,
-    ):
+    def eval(self, X, Y, M=None, compute_dK_dK_t=False, bw=None, **kwargs,):
 
         assert X.shape == Y.shape
 
@@ -147,17 +126,8 @@ class RBF(BaseKernel):
         # Used for SVN updates
         dK_dK_t = None
         if compute_dK_dK_t:
-            dK_dK_t = torch.einsum(
-                    'bijk,bilm->bijm',
-                    d_K_Xi.unsqueeze(3),
-                    d_K_Xi.unsqueeze(2),
-                )
-        return (
-            K,
-            d_K_Xi,
-            dK_dK_t,
-            pw_dists_sq,
-        )
+            dK_dK_t = torch.einsum('bijk,bilm->bijm', d_K_Xi.unsqueeze(3),d_K_Xi.unsqueeze(2),)
+        return (K, d_K_Xi, dK_dK_t, pw_dists_sq,)
 
 
 class IMQ(BaseKernel):
@@ -165,34 +135,17 @@ class IMQ(BaseKernel):
         IMQ Matrix-valued kernel, with metric M.
         k(x, x') = M^-1 (alpha + (x - y) M (x - y)^T ) ** beta
     """
-    def __init__(
-        self,
-        # alpha=1,
-        # beta=-0.5,
-        alpha=1,
-        beta=-0.5,
-        hessian_scale=1,
-        analytic_grad=True,
-        median_heuristic=True,
-        **kwargs,
-    ):
+    def __init__(self, alpha=1, beta=-0.5, hessian_scale=1, analytic_grad=True, median_heuristic=True, **kwargs,):
 
         self.alpha = alpha
         self.beta = beta
 
-        super().__init__(
-            analytic_grad,
-        )
+        super().__init__(analytic_grad,)
+
         self.hessian_scale = hessian_scale
         self.median_heuristic = median_heuristic
 
-    def eval(
-        self,
-        X, Y,
-        M=None,
-        compute_dK_dK_t=False,
-        **kwargs,
-        ):
+    def eval(self, X, Y, M=None, compute_dK_dK_t=False, **kwargs,):
 
         assert X.shape == Y.shape
         b, dim = X.shape
@@ -231,46 +184,19 @@ class IMQ(BaseKernel):
         # Used for SVN updates
         dK_dK_t = None
         if compute_dK_dK_t:
-            dK_dK_t = torch.einsum(
-                    'bijk,bilm->bijm',
-                    d_K_Xi.unsqueeze(3),
-                    d_K_Xi.unsqueeze(2),
-                )
-        return (
-            K,
-            d_K_Xi,
-            dK_dK_t,
-            pw_dists_sq,
-        )
+            dK_dK_t = torch.einsum('bijk,bilm->bijm', d_K_Xi.unsqueeze(3), d_K_Xi.unsqueeze(2),)
+        return (K, d_K_Xi, dK_dK_t, pw_dists_sq,)
 
 
 class RBF_Anisotropic(RBF):
     """
         k(x, x') = exp( - (x - y) M (x - y)^T / (2 * d))
     """
-    def __init__(
-        self,
-        hessian_scale=1,
-        median_heuristic=False,
-        bandwidth=-1,
-        analytic_grad=True,
-        **kwargs,
-    ):
-        super().__init__(
-            bandwidth=bandwidth,
-            analytic_grad=analytic_grad,
-            median_heuristic=median_heuristic
-        )
+    def __init__(self, hessian_scale=1, median_heuristic=False, bandwidth=-1, analytic_grad=True, **kwargs,):
+        super().__init__(bandwidth=bandwidth, analytic_grad=analytic_grad, median_heuristic=median_heuristic)
         self.hessian_scale = hessian_scale
 
-    def eval(
-        self,
-        X, Y,
-        M=None,
-        compute_dK_dK_t=False,
-        bw=None,
-        **kwargs,
-    ):
+    def eval(self, X, Y, M=None, compute_dK_dK_t=False, bw=None, **kwargs,):
 
         assert X.shape == Y.shape
 
@@ -302,44 +228,21 @@ class RBF_Anisotropic(RBF):
         # Used for SVN updates
         dK_dK_t = None
         if compute_dK_dK_t:
-            dK_dK_t = torch.einsum(
-                    'bijk,bilm->bijm',
-                    d_K_Xi.unsqueeze(3),
-                    d_K_Xi.unsqueeze(2),
-                )
-        return (
-            K,
-            d_K_Xi,
-            dK_dK_t,
-            pw_dists_sq,
-        )
+            dK_dK_t = torch.einsum('bijk,bilm->bijm', d_K_Xi.unsqueeze(3), d_K_Xi.unsqueeze(2),)
+        return (K, d_K_Xi, dK_dK_t, pw_dists_sq,)
 
 
 class Linear(BaseKernel):
     """
         k(x, x') = x^T x' + 1
     """
-    def __init__(
-        self,
-        analytic_grad=True,
-        subtract_mean=True,
-        with_scaling=False,
-        **kwargs,
-    ):
-        super().__init__(
-            analytic_grad,
-        )
+    def __init__(self, analytic_grad=True, subtract_mean=True, with_scaling=False, **kwargs,):
+        super().__init__(analytic_grad,)
         self.analytic_grad = analytic_grad
         self.subtract_mean = subtract_mean
         self.with_scaling = with_scaling
 
-    def eval(
-            self,
-            X, Y,
-            M=None,
-            compute_dK_dK_t=False,
-            **kwargs,
-    ):
+    def eval(self, X, Y, M=None, compute_dK_dK_t=False, **kwargs,):
 
         assert X.shape == Y.shape
         batch, dim = X.shape
@@ -362,15 +265,6 @@ class Linear(BaseKernel):
         # Used for SVN updates
         dK_dK_t = None
         if compute_dK_dK_t:
-            dK_dK_t = torch.einsum(
-                    'bijk,bilm->bijm',
-                    d_K_Xi.unsqueeze(3),
-                    d_K_Xi.unsqueeze(2),
-                )
+            dK_dK_t = torch.einsum('bijk,bilm->bijm', d_K_Xi.unsqueeze(3), d_K_Xi.unsqueeze(2),)
 
-        return (
-            K,
-            d_K_Xi,
-            dK_dK_t,
-            None,
-        )
+        return (K, d_K_Xi, dK_dK_t, None,)

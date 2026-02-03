@@ -32,188 +32,100 @@ from stein_lib.prm_utils import get_graph
 from stein_lib.svgd.base_kernels import RBF, RBF_Anisotropic
 from stein_lib.svgd.LBFGS import FullBatchLBFGS, LBFGS
 
-if not torch.cuda.is_available():
-    device = torch.device('cpu')
-    torch.set_default_tensor_type(torch.DoubleTensor)
-else:
-    device = torch.device('cuda')
-    torch.set_default_tensor_type(torch.cuda.DoubleTensor)
 
-###### Params ######
-# num_particles = 100
-num_particles = 250
-# num_particles = 2000
-# num_particles = 1
-# iters = 3000
-# iters = 200
-iters = 100
-# iters = 1
+def test_bhm():
 
-# Sample intial particles
-torch.manual_seed(1)
+    if not torch.cuda.is_available():
+        device = torch.device('cpu')
+        torch.set_default_device(device)
+    else:
+        device = torch.device('cuda')
+        torch.set_default_device(device)
 
-## Large Gaussian in center of intel map.
-# prior_dist = Normal(loc=torch.tensor([3.,-10.]),
-#                     scale=torch.tensor([10., 10.]))
+    ###### Params ######
+    # num_particles = 100
+    num_particles = 250
+    # num_particles = 2000
+    # num_particles = 1
+    # iters = 3000
+    # iters = 200
+    iters = 100
+    # iters = 1
 
-## Small gaussian in corner of intel map.
-# prior_dist = Normal(loc=torch.tensor([12.,-3.]),
-#                     scale=torch.tensor([1.,1.]))
+    # Sample intial particles
+    torch.manual_seed(1)
 
-## Two small gaussians in opposing corners of intel map.
-# sigma = 5.
-# radii_list = [[sigma, sigma],] * 2
-# prior_dist = mixture_of_gaussians(
-#     num_comp=2,
-#     mu_list=[[12.,-3.], [-5, -18] ],
-#     sigma_list=radii_list,
-# )
+    ## Large Gaussian in center of intel map.
+    # prior_dist = Normal(loc=torch.tensor([3.,-10.]), scale=torch.tensor([10., 10.]))
 
-## Uniform distribution
-prior_dist = Uniform(low=torch.tensor([-10., -25.]).to(device),
-                    high=torch.tensor([20., 5.]).to(device))
+    ## Small gaussian in corner of intel map.
+    # prior_dist = Normal(loc=torch.tensor([12.,-3.]), scale=torch.tensor([1.,1.]))
 
-particles_0 = prior_dist.sample((num_particles,))
+    ## Two small gaussians in opposing corners of intel map.
+    # sigma = 5.
+    # radii_list = [[sigma, sigma],] * 2
+    # prior_dist = mixture_of_gaussians(num_comp=2, mu_list=[[12.,-3.], [-5, -18] ], sigma_list=radii_list,)
 
-# Load model
-import bhmlib
-bhm_path = Path(bhmlib.__path__[0]).resolve()
-# model_file = bhm_path / 'Outputs' / 'saved_models' / 'bhm_intel_res0.25_iter100.pt'
-# model_file = '/tmp/bhm_intel_res0.25_iter100.pt'
-model_file = '/tmp/bhm_intel_res0.25_iter900.pt'
-ax_limits = [[-10, 20], [-25, 5]]
-model = BayesianHilbertMap(model_file, ax_limits, device)
+    ## Uniform distribution
+    prior_dist = Uniform(low=torch.tensor([-10., -25.]).to(device), high=torch.tensor([20., 5.]).to(device))
+
+    particles_0 = prior_dist.sample((num_particles,))
+
+    # Load model
+    import Bayesian_Hilbert_Maps.bhmlib
+    bhm_path = Path(Bayesian_Hilbert_Maps.bhmlib.__path__[0]).resolve()
+    model_file = bhm_path / 'Outputs' / 'saved_models' / 'bhm_intel_res0.25_iter100.pt'
+
+    ax_limits = [[-10, 20], [-25, 5]]
+    model = BayesianHilbertMap(model_file, ax_limits, device)
 
 
-# particles = particles_0.clone().cpu().numpy()
-# particles = torch.from_numpy(particles)
-particles = particles_0.clone().detach()
+    # particles = particles_0.clone().cpu().numpy()
+    # particles = torch.from_numpy(particles)
+    particles = particles_0.clone().detach()
 
 
-#================== Kernel ===========================
+    #================== Kernel ===========================
 
-# kernel = RBF(
-#     hessian_scale=1.0,
-#     analytic_grad=True,
-#     median_heuristic=False,
-#     bandwidth=5.0,
-# )
+    # kernel = RBF(hessian_scale=1.0, analytic_grad=True, median_heuristic=False, bandwidth=5.0,)
 
-# kernel = RBF(
-#     hessian_scale=1.0,
-#     analytic_grad=True,
-#     median_heuristic=False,
-#     bandwidth=1.0,
-# )
+    # kernel = RBF(hessian_scale=1.0, analytic_grad=True, median_heuristic=False, bandwidth=1.0,)
 
-kernel = RBF_Anisotropic(
-    hessian_scale=1.0,
-    analytic_grad=True,
-    median_heuristic=False,
-    bandwidth=1.0,
-)
+    kernel = RBF_Anisotropic(hessian_scale=1.0, analytic_grad=True, median_heuristic=False, bandwidth=1.0,)
 
-#================== Optimizer ===========================
+    #================== Optimizer ===========================
 
-# optimizer = torch.optim.SGD([particles], lr=1.)
+    # optimizer = torch.optim.SGD([particles], lr=1.)
 
-optimizer = torch.optim.Adam([particles], lr=0.25)
+    optimizer = torch.optim.Adam([particles], lr=0.25)
 
-# optimizer = torch.optim.LBFGS(
-#    [particles],
-#    lr=0.1,
-#    max_iter=100,
-#    # max_eval=20 * 1.25,
-#    tolerance_change=1e-9,
-#    history_size=25,
-#    line_search_fn=None, #'strong_wolfe'
-# )
+    # optimizer = torch.optim.LBFGS([particles], lr=0.1, max_iter=100, max_eval=20 * 1.25, tolerance_change=1e-9, history_size=25, line_search_fn=None,)
 
-# optimizer = FullBatchLBFGS(
-#    [particles],
-#    lr=0.1,
-#    history_size=25,
-#    line_search='None', #'Wolfe'
-# )
+    # optimizer = FullBatchLBFGS([particles], lr=0.1, history_size=25, line_search='None',)
 
-#================== SVGD ===========================
+    #================== SVGD ===========================
 
-svgd = SVGD(
-    kernel=kernel,
-    kernel_structure=None,
-    repulsive_scaling=1.,
-    geom_metric_type='fisher',
-    verbose=True,
-)
+    svgd = SVGD(kernel=kernel, kernel_structure=None, repulsive_scaling=1., geom_metric_type='fisher', verbose=True,)
 
-from time import time
-t_start = time()
-## Optimize
-(particles,
- p_hist,
- pw_dists,
- pw_dists_scaled) = svgd.apply(
-    particles,
-    model,
-    iters,
-    # use_analytic_grads=True,
-    use_analytic_grads=False,
-    optimizer=optimizer,
-)
+    from time import time
+    t_start = time()
+    ## Optimize
+    (particles, p_hist, pw_dists, pw_dists_scaled) = svgd.apply(particles, model, iters, use_analytic_grads=False, optimizer=optimizer,)
 
-print('\nOptimization time: ', time() - t_start)
-print("\nMean Est.: ", particles.mean(0))
-print("Std Est.: ", particles.std(0))
+    print('\nOptimization time: ', time() - t_start)
+    print("\nMean Est.: ", particles.mean(0))
+    print("Std Est.: ", particles.std(0))
 
-#================== Graph ===========================
+    #================== Graph ===========================
 
-# (nodes,
-#  edge_lengths,
-#  edge_vals,
-#  edge_coll_binary,
-#  edge_coll_num_pts,
-#  edge_coll_pts,
-#  params) = get_graph(
-#     particles.detach(),
-#     pw_dists,
-#     model,
-#     collision_thresh=5.,
-#     collision_res=0.25,
-#     connect_radius=5.,
-#     include_coll_pts=True,  # For debugging, visualization
-# )
+    (nodes, edge_lengths, edge_vals, edge_coll_binary, edge_coll_num_pts, edge_coll_pts, params) = get_graph(particles.detach(), pw_dists, model, collision_thresh=5., collision_res=0.25, connect_radius=5., include_coll_pts=True,)
 
-#================== Visualization ===========================
+    #================== Visualization ===========================
 
-# Plot Graph
-# plot_graph_2D(
-#     particles.detach(),
-#     nodes,
-#     model.log_prob,
-#     edge_vals=edge_vals,
-#     edge_coll_thresh=50.,
-#     # edge_coll_pts=edge_coll_pts,
-#     ax_limits=ax_limits,
-#     to_numpy=True,
-#     save_path='./graph_svgd_{}_bhm_intel_np_{}.png'.format(
-#         kernel.__class__.__name__,
-#         num_particles,
-#     ),
-# )
+    # Plot Graph
+    plot_graph_2D(particles.detach(), nodes, model.log_prob, edge_vals=edge_vals, edge_coll_thresh=50., ax_limits=ax_limits, to_numpy=True, save_path='./graph_svgd_{}_bhm_intel_np_{}.png'.format(kernel.__class__.__name__, num_particles,),)
 
-particles = particles.cpu()
+    particles = particles.cpu()
 
-# Make movie
-create_movie_2D(
-    p_hist,
-    model,
-    to_numpy=True,
-    save_path='./svgd_{}_bhm_intel_np_{}.mp4'.format(
-        kernel.__class__.__name__,
-        num_particles,
-    ),
-    ax_limits=ax_limits,
-    opt='SVGD',
-    kernel_base_type=kernel.__class__.__name__,
-    num_particles=num_particles,
-)
+    # Make movie
+    create_movie_2D(p_hist, model, to_numpy=True, save_path=f"./svgd_{kernel.__class__.__name__}_bhm_intel_np_{num_particles}.mp4", ax_limits=ax_limits, opt='SVGD', kernel_base_type=kernel.__class__.__name__, num_particles=num_particles,)

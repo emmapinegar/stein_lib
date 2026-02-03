@@ -38,15 +38,7 @@ class SVGD():
         Uses analytic kernel gradients.
     """
 
-    def __init__(
-            self,
-            kernel=None,
-            kernel_structure=None,
-            verbose=False,
-            control_dim=None,
-            repulsive_scaling=1.,
-            **kernel_params, #not sure if necessary anymore
-    ):
+    def __init__(self, kernel=None, kernel_structure=None, verbose=False, control_dim=None, repulsive_scaling=1., **kernel_params,):
 
         self.verbose = verbose
         self.kernel_base_type = kernel.__class__.__name__
@@ -60,19 +52,10 @@ class SVGD():
         self.hessian_scaled = False
         self._M = None
 
-        supported_base_kernels = [
-            'ABCMeta', # not entirely sure why this is necessary yet
-            'RBF',
-            'IMQ',
-            'RBF_Anisotropic',
-            'Linear',
-        ]
-        hessian_scaled_kernels = [
-            'RBF_Anisotropic',
-            'RBF_Matrix',
-            'IMQ_Matrix',
-            'RBF_Weighted_Matrix',
-        ]
+        supported_base_kernels = [ 'ABCMeta','RBF','IMQ','RBF_Anisotropic','Linear',]
+
+        hessian_scaled_kernels = ['RBF_Anisotropic', 'RBF_Matrix', 'IMQ_Matrix', 'RBF_Weighted_Matrix',]
+
         if self.kernel_base_type in hessian_scaled_kernels :
             self.hessian_scaled = True
 
@@ -81,28 +64,16 @@ class SVGD():
             raise IOError('Stein kernel type not recognized: ', self.kernel_base_type)
 
     # this iid wrapper can be included when building kernel rather than apart of this class
-    def get_kernel(
-            self,
-            **kernel_params,
-    ):
+    def get_kernel(self,**kernel_params,):
 
         if self.kernel_structure is None:
             return self.base_kernel
         elif self.kernel_structure == 'iid':
-            return iid(
-                kernel=self.base_kernel,
-                **kernel_params,
-            )
+            return iid( kernel=self.base_kernel,**kernel_params,)
         else:
-            raise IOError('Kernel structure not recognized for SVGD: ',
-                          self.kernel_structure,)
+            raise IOError('Kernel structure not recognized for SVGD: ', self.kernel_structure,)
 
-    def get_svgd_terms(
-            self,
-            X,
-            dlog_p,
-            M=None,
-    ):
+    def get_svgd_terms(self, X, dlog_p, M=None,):
         """
         Parameters
         ----------
@@ -151,23 +122,10 @@ class SVGD():
         pw_dists_sq:
 
         """
-        k_XX, grad_k, _, pw_dists_sq = self.kernel.eval(
-            X, X.clone().detach(),
-            M,
-            compute_dK_dK_t=False,
-        )
+        k_XX, grad_k, _, pw_dists_sq = self.kernel.eval(X, X.clone().detach(), M, compute_dK_dK_t=False,)
         return k_XX, grad_k, pw_dists_sq
     
-    def phi(
-        self,
-        X,
-        dlog_p,
-        dlog_lh=None,
-        Hess=None,
-        Hess_prior=None,
-        Jacobian=None,
-        copy_pw_dists=False
-    ):
+    def phi(self, X, dlog_p, dlog_lh=None, Hess=None, Hess_prior=None, Jacobian=None, copy_pw_dists=False):
         """
         Computes the SVGD gradient.
 
@@ -214,16 +172,10 @@ class SVGD():
             raise NotImplementedError
 
         # SVGD attractive / repulsive terms, inter-particle distances
-        grad, rep, pw_dists_sq = self.get_svgd_terms(
-            X,
-            dlog_p,
-            M,
-        )
+        grad, rep, pw_dists_sq = self.get_svgd_terms(X, dlog_p, M,)
+
         if self.verbose:
-            print('gradient l2-norm: {:5.4f}'.format(
-                grad.norm().detach().cpu().numpy()))
-            print('repulsive l2-norm: {:5.4f}'.format(
-                rep.norm().detach().cpu().numpy()))
+            print(f"grad l2: {grad.norm().detach().cpu().numpy():5.4f} rep l2: {rep.norm().detach().cpu().numpy():5.4f} grad: {grad[0].detach().cpu().numpy()} rep: {rep[0].detach().cpu().numpy()}")
 
         # SVGD gradient
         phi = grad + self.repulsive_scaling * rep
@@ -233,14 +185,7 @@ class SVGD():
 
         return phi, pw_dists_sq
 
-    def apply(
-            self,
-            X,
-            model,
-            iters=100,
-            use_analytic_grads=False,
-            optimizer=None,
-    ):
+    def apply(self, X, model, iters=100, use_analytic_grads=False, optimizer=None,):
         """
         Runs SVGD optimization on a distribution model, given a particle
          initialization X, and a selected optimization algorithm.
@@ -289,8 +234,7 @@ class SVGD():
                 else:
                     dlog_p = model.grad_log_p(X)
 
-                if self.hessian_scaled and \
-                    self.geom_metric_type not in ['fisher']:
+                if self.hessian_scaled and self.geom_metric_type not in ['fisher']:
 
                     if isinstance(model, doubleBanana_analytic):
                         ## Used only by double_banana model
@@ -301,23 +245,13 @@ class SVGD():
             else:
                 # Numerical Gradients
                 log_p = model.log_prob(X).unsqueeze(1)
-                dlog_p = torch.autograd.grad(
-                    log_p.sum(),
-                    X,
-                    create_graph=True,
-                )[0]
-                if self.hessian_scaled and \
-                    self.geom_metric_type not in ['fisher']:
+                dlog_p = torch.autograd.grad(log_p.sum(), X, create_graph=True,)[0]
+                if self.hessian_scaled and self.geom_metric_type not in ['fisher']:
                     Hess = get_jacobian(dlog_p, X)
 
             # SVGD gradient
             with torch.no_grad():
-                Phi, pw_dists_sq = self.phi(
-                    X,
-                    dlog_p,
-                    dlog_lh=dlog_p,
-                    Hess=Hess,
-                )
+                Phi, pw_dists_sq = self.phi(X, dlog_p, dlog_lh=dlog_p, Hess=Hess,)
             X.grad = -1. * Phi
             # check(X.grad, 'X.grad')
             loss = 1.
@@ -338,18 +272,11 @@ class SVGD():
             particle_history.append(X.clone().detach().cpu().numpy())
         dt_stats = np.array(dts)
         if self.verbose:
-            print("\nAvg. SVGD compute time: {}".format(dt_stats.mean()))
-            print("Std. dev. SVGD compute time: {}\n".format(dt_stats.std()))
+            print(f"\nAvg. SVGD compute time: {dt_stats.mean():5.8f} \t Std. dev. SVGD compute time: {dt_stats.std():5.8f}\n")
 
-        (pw_dists,
-         pw_dists_scaled,) = self.get_pairwise_dists()
+        (pw_dists, pw_dists_scaled,) = self.get_pairwise_dists()
 
-        return (
-            X,
-            particle_history,
-            pw_dists,
-            pw_dists_scaled,
-        )
+        return (X, particle_history, pw_dists, pw_dists_scaled,)
 
     def get_pairwise_dists(self):
         # pw_dists output from svgd-gradient computation
