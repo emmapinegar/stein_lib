@@ -28,19 +28,21 @@ from Bayesian_Hilbert_Maps.bhmlib.BHM.pytorch.bhm_pytorch import BHM_PYTORCH
 
 
 class BayesianHilbertMap:
-    def __init__(self, file_path=None, limits=((-10, 20,), (-25, 5)), device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"), dim=2,):
+    def __init__(self, file_path=None, limits=((-10, 20,), (-25, 5)), device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"), dim=2, limit_scale=1):
         self.dim = dim
         self.device = device
+        self.limit_scale = limit_scale
         # Load trained Bayesian Hilbert Map
         params = torch.load(file_path)
         for k, v in params.items():
             if isinstance(v, torch.Tensor):
                 params[k] = v.to(device)
-        self.bhm = BHM_PYTORCH(torch_kernel_func=True, **params)
         if limits is not None:
             self.limits = torch.tensor(limits).to(device)
         else:
             self.limits = None
+        self.bhm = BHM_PYTORCH(torch_kernel_func=True, cell_max_min=self.limits, limit_scale=self.limit_scale, **params)
+
 
     def log_prob(self, x):
         if x.dim() == 1:
@@ -48,14 +50,14 @@ class BayesianHilbertMap:
         log_p = self.bhm.log_prob_vacancy(x)
         print_str = f"log_p: {log_p[0]:5.6f} "
         if self.limits is not None:
-            scale = 1.
-            log_p -= torch.exp(-scale*(x[:, 0] - self.limits[0, 0]))
-            log_p -= torch.exp( scale*(x[:, 0] - self.limits[0, 1]))
-            log_p -= torch.exp(-scale*(x[:, 1] - self.limits[1, 0]))
-            log_p -= torch.exp( scale*(x[:, 1] - self.limits[1, 1]))
+
+            log_p -= torch.exp(-self.limit_scale*(x[:, 0] - self.limits[0, 0]))
+            log_p -= torch.exp( self.limit_scale*(x[:, 0] - self.limits[0, 1]))
+            log_p -= torch.exp(-self.limit_scale*(x[:, 1] - self.limits[1, 0]))
+            log_p -= torch.exp( self.limit_scale*(x[:, 1] - self.limits[1, 1]))
             if self.dim > 2:
-                log_p -= torch.exp(-scale*(x[:, 2] - self.limits[2, 0]))
-                log_p -= torch.exp( scale*(x[:, 2] - self.limits[2, 1]))  
+                log_p -= torch.exp(-self.limit_scale*(x[:, 2] - self.limits[2, 0]))
+                log_p -= torch.exp( self.limit_scale*(x[:, 2] - self.limits[2, 1]))  
                 print_str = f"{print_str} new: {log_p[0]:5.6f} x: {x[0,0] - self.limits[0,0]:5.6f} {x[0,0] - self.limits[0,1]:5.6f} y: {x[0,1] - self.limits[1,0]:5.6f} {x[0,1] - self.limits[1,1]:5.6f} z: {x[0,2] - self.limits[2,0]:5.6f} {x[0,2] - self.limits[2,1]:5.6f}"    
         print(print_str)                              
         return log_p

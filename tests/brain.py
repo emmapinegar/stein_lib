@@ -41,20 +41,22 @@ def test_brain_3D():
 
     num_particles = 10000
     iters = 20
-    analytic_grads = False
+    analytic_grads = True
 
-    median_heuristic = False
+    median_heuristic = True
     if median_heuristic:
         bandwidth = -1.
     else:
         bandwidth = 250.
 
-    repulsive_scaling = 0.
+    repulsive_scaling = 1.
     if analytic_grads:
         repulsive_scaling = -repulsive_scaling
     step_size = 1.
 
     lim_func = False
+    limit_scale = 1
+    transform = np.loadtxt("./remind_001_obstacles.txt", max_rows=4)
 
 
     # Sample intial particles
@@ -100,17 +102,17 @@ def test_brain_3D():
         # Load model
         from Bayesian_Hilbert_Maps import bhmlib
         bhm_path = Path(bhmlib.__path__[0]).resolve()
-        model_file = bhm_path / 'Outputs' / 'saved_models' / 'bhm_remind_test_log_res1.5_iter200.pt'
+        model_file = bhm_path / 'Outputs' / 'saved_models' / 'bhm_remind_test_log_res1.5_iter125.pt'
 
         if not lim_func:
             grad_ax_limits = None
-        model = BayesianHilbertMap(model_file, grad_ax_limits, dim=3, device=device_)
+        model = BayesianHilbertMap(model_file, grad_ax_limits, dim=3, device=device_, limit_scale=limit_scale)
         
         #================== Kernel ===========================
 
         # kernel = RBF(hessian_scale=1.0, analytic_grad=True, median_heuristic=False, bandwidth=1.0,)
 
-        kernel = RBF_Anisotropic(hessian_scale=1.0, analytic_grad=True, median_heuristic=False, bandwidth=bandwidth,)
+        kernel = RBF_Anisotropic(hessian_scale=1.0, analytic_grad=analytic_grads, median_heuristic=median_heuristic, bandwidth=bandwidth,)
 
         #================== Optimizer ===========================
 
@@ -133,10 +135,15 @@ def test_brain_3D():
 
         #=============================================
 
-        # particles_ = particles.detach().numpy()
-        # old_particles = np.loadtxt("./remind_001_samples.txt")
-        # particles_ = np.vstack((old_particles[:,0:3], particles_))
-        # np.savetxt("./remind_001_samples.txt", particles_, fmt='%9f ')
+        
+        particles_ = particles.detach().numpy()
+        particles_ = np.transpose(particles_)
+        particles_ = np.concatenate((particles_, np.ones(1, np.shape(particles_)[1])))
+        particles_ = np.matmul(transform, particles_)
+        particles_ = np.transpose(particles_[:,0:3])
+        old_particles = np.loadtxt("./remind_001_samples.txt")
+        particles_ = np.vstack((old_particles[:,0:3], particles_))
+        np.savetxt("./remind_001_samples.txt", particles_, fmt='%9f ')
 
         fig_prename = f"./figures/{optimizer.__class__.__name__}_{kernel.__class__.__name__}_np_{num_particles}_iters_{iters}_eps_{step_size}_repulsive_{repulsive_scaling}_bw_{bandwidth}_limfunc_{lim_func}_analytic_{analytic_grads}"
         kernel_optim_str = f"{optimizer.__class__.__name__} {kernel.__class__.__name__} np={num_particles} eps={step_size}"
@@ -233,7 +240,7 @@ def test_brain_2D():
 
     # kernel = RBF(hessian_scale=1.0, analytic_grad=True, median_heuristic=False, bandwidth=1.0,)
 
-    kernel = RBF_Anisotropic(hessian_scale=1.0, analytic_grad=True, median_heuristic=False, bandwidth=bandwidth,)
+    kernel = RBF_Anisotropic(hessian_scale=1.0, analytic_grad=analytic_grads, median_heuristic=median_heuristic, bandwidth=bandwidth,)
 
     #================== Optimizer ===========================
 

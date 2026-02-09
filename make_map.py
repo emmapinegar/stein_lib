@@ -61,12 +61,7 @@ def make_map_2D():
     #device = pt.device("cuda:0") # Uncomment this to run on GPU
 
     # Read the file
-    (fn_train,
-    cell_resolution,
-    cell_max_min,
-    skip,
-    thresh,
-    gamma,) = load_parameters(dataset)
+    (fn_train, cell_resolution, cell_max_min, skip, thresh, gamma,) = load_parameters(dataset)
 
     #read data
     # g = pd.read_csv(fn_train, delimiter=',').values
@@ -146,14 +141,7 @@ def make_map_2D():
         if ith_scan == 0:
             # get all data for the first scan and initialize the model
             X, y = X_new, y_new
-            bhm_mdl = BHM_PYTORCH(
-                gamma=gamma,
-                grid=None,
-                cell_resolution=cell_resolution,
-                cell_max_min=cell_max_min,
-                X=X[:,0:2],
-                nIter=1,
-            )
+            bhm_mdl = BHM_PYTORCH(gamma=gamma, grid=None, cell_resolution=cell_resolution, cell_max_min=cell_max_min, X=X[:,0:2], nIter=1,)
 
 
         print(print_str)
@@ -165,35 +153,32 @@ def make_map_2D():
 
         q_resolution = 1
         if ith_scan % plot_iter == 0:
-            ones_ = np.where(np.logical_and(X[:,2] >= ith_scan + min_t + skip//2, X[:,2] < ith_scan + min_t + skip//2 + 1))
-            print(np.shape(ones_))        
+            ones_ = np.where(np.logical_and(X[:,2] >= ith_scan + min_t + skip//2, X[:,2] < ith_scan + min_t + skip//2 + 1))      
             Xq = X[ones_[0],0:2]
             yq = bhm_mdl.predict(Xq)
             yq = yq.cpu().numpy()
             y_diff = y[ones_].reshape(-1,) - yq.reshape(-1,)
-            # print(f"Fit time: {t2 - t1:.2f} Pred time: {t4 - t3:.2f} iter time: {t4 - t1:.2f} \tPlotting...\n")
+            colormap = 'plasma'
 
             Xq = Xq.cpu().numpy()
 
             pl.figure(figsize=(18,5))
             pl.subplot(131)
-
-            # ones_ = np.where(y ==1)
-            # pl.scatter(X[ones_, 0], X[ones_, 1], c='r', cmap='jet', s=5, edgecolors='')
-            pl.scatter(X[ones_, 0], X[ones_, 1], c=y[ones_], cmap='jet', s=5, vmin=0, vmax=1)
+            pl.scatter(X[ones_, 0], X[ones_, 1], c=y[ones_], cmap=colormap, s=5, vmin=0, vmax=1)
             pl.axis('equal')
             pl.title('Laser hit points at t={}'.format(np.unique(ith_scan + min_t + skip//2)))
             pl.xlim([cell_max_min[0], cell_max_min[1]]); pl.ylim([cell_max_min[2], cell_max_min[3]])
+            
             pl.subplot(132)
             pl.title('SBHM at t={}'.format(np.unique(ith_scan + min_t + skip//2)))
-            # pl.scatter(Xq[:, 0], Xq[:, 1], c=yq, cmap='jet', s=10, marker='8',edgecolors='')
-            pl.scatter(Xq[:, 0], Xq[:, 1], c=yq, cmap='jet', s=5, vmin=0, vmax=1)
-
+            pl.scatter(Xq[:, 0], Xq[:, 1], c=yq, cmap=colormap, s=5, vmin=0, vmax=1)
+            pl.axis('equal')
             pl.colorbar()
             pl.xlim([cell_max_min[0], cell_max_min[1]]); pl.ylim([cell_max_min[2], cell_max_min[3]])
 
             pl.subplot(133)
-            pl.scatter(Xq[:, 0], Xq[:, 1], c=y_diff, cmap='jet', s=5, vmin=-1, vmax=1)
+            pl.scatter(Xq[:, 0], Xq[:, 1], c=y_diff, cmap=colormap, s=5, vmin=-1, vmax=1)
+            pl.axis('equal')
             pl.colorbar()
             pl.xlim([cell_max_min[0], cell_max_min[1]]); pl.ylim([cell_max_min[2], cell_max_min[3]])
             pl.savefig(os.path.abspath('./Bayesian_Hilbert_Maps/bhmlib/Outputs/images/remind_2D_{:03d}.png'.format(ith_scan)), bbox_inches='tight')
@@ -229,11 +214,11 @@ def make_map_3D():
         parameters = \
             {'remind': \
                 ( os.path.abspath('./remind_001_obstacles.txt'),
-                (5, 5, 5), #hinge point resolution
+                (6, 6, 6), #hinge point resolution
                 (-80, 80, -80, 80, -80, 80), #area [min1, max1, min2, max2]
-                20000,
+                32000,
                 None,
-                0.13, #gamma
+                0.08, #gamma
                 ),
 
             }
@@ -248,8 +233,8 @@ def make_map_3D():
     dataset = 'remind'
     save_path = Path("./Bayesian_Hilbert_Maps/bhmlib/Outputs/saved_models/")   # an be None
     save_iter = 25
-    plot_iter = 10
-    q_resolution = 1.5
+    plot_iter = 5
+    q_resolution = 2
     # colormap = 'inferno'
 
     # if (pt.cuda.is_available()):
@@ -290,7 +275,7 @@ def make_map_3D():
 
     # obspoints = np.matmul(transform, obspoints)
     # freepoints = np.matmul(transform, freepoints)
-    hinge_point_buffer = 2*cell_resolution[0]
+    hinge_point_buffer = 10 #2*cell_resolution[0]
     cell_max_min = (np.min(freepoints[0,:]) - hinge_point_buffer, np.max(freepoints[0,:]) + hinge_point_buffer, np.min(freepoints[1,:]) - hinge_point_buffer, np.max(freepoints[1,:]) + hinge_point_buffer, np.min(freepoints[2,:]) - hinge_point_buffer, np.max(freepoints[2,:]) + hinge_point_buffer)
     freepoints[3,:] = 0
 
@@ -320,7 +305,7 @@ def make_map_3D():
     # ith_scan_indx = pt.logical_and(X_train[:,2] >= ith_scan + min_t, X_train[:,2] < ith_scan + min_t + skip)
     # X = X_train[ith_scan_indx, :]
 
-    bhm_mdl = BHM_PYTORCH(gamma=gamma, grid=None, cell_resolution=cell_resolution, X=pt.tensor(np.transpose(freepoints), device=device), nIter=1, device=device, torch_kernel_func=True) # cell_max_min=cell_max_min,
+    bhm_mdl = BHM_PYTORCH(gamma=gamma, grid=None, cell_resolution=cell_resolution, X=pt.tensor(np.transpose(freepoints), device=device), nIter=1, device=device, torch_kernel_func=True, cell_max_min=cell_max_min) # cell_max_min=cell_max_min,
     # bhm_mdl.load("./Bayesian_Hilbert_Maps/bhmlib/Outputs/saved_models/" + 'bhm_remind_res1_iter114.pt')
 
     for ith_scan in range(0, max_t):

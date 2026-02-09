@@ -6,5 +6,5 @@ from tests.brain import test_brain_2D, test_brain_3D
 
 if __name__=='__main__':
     # test_bhm()
-    # test_brain_3D()
-    test_brain_2D
+    test_brain_3D()
+    # test_brain_2D
