@@ -37,10 +37,10 @@ from stein_lib.mcmc.hmc import HMC, NUTS
 
 if not torch.cuda.is_available():
     device = torch.device('cpu')
-    torch.set_default_tensor_type(torch.DoubleTensor)
+    torch.set_default_dtype(torch.float32)
 else:
     device = torch.device('cuda')
-    torch.set_default_tensor_type(torch.cuda.DoubleTensor)
+    torch.set_default_dtype(torch.float32)
 
 def test_bhm_mcmc():
     ###### Params ######

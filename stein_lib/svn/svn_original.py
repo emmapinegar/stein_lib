@@ -25,7 +25,7 @@ import numpy as np
 import torch
 
 from time import time
-torch.set_default_tensor_type(torch.DoubleTensor)
+torch.set_default_dtype(torch.float32)
 
 
 class SVN_original:

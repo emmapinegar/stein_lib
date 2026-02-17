@@ -252,7 +252,10 @@ class SVGD():
             # SVGD gradient
             with torch.no_grad():
                 Phi, pw_dists_sq = self.phi(X, dlog_p, dlog_lh=dlog_p, Hess=Hess,)
-            X.grad = -1. * Phi
+            if use_analytic_grads: 
+                X.grad = Phi
+            else:
+                X.grad = -1 * Phi
             # check(X.grad, 'X.grad')
             loss = 1.
             return loss
@@ -267,7 +270,7 @@ class SVGD():
                 optimizer.step(closure)
             dt = time() - t_start
             if self.verbose:
-                print('dt (SVGD): {}\n'.format(dt))
+                print(f"i: {i} dt (SVGD): {dt}\n")
             dts.append(dt)
             particle_history.append(X.clone().detach().cpu().numpy())
         dt_stats = np.array(dts)

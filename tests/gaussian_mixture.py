@@ -29,7 +29,7 @@ from stein_lib.models.gaussian_mixture import mixture_of_gaussians
 from stein_lib.utils import create_movie_2D
 from stein_lib.svgd.base_kernels import RBF, RBF_Anisotropic
 
-torch.set_default_tensor_type(torch.DoubleTensor)
+torch.set_default_dtype(torch.float32)
 
 def test_gm():
     ###### Params ######

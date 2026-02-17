@@ -32,7 +32,8 @@ from stein_lib.svgd.base_kernels import RBF, RBF_Anisotropic
 from stein_lib.utils import create_movie_2D, plot_graph_2D, plot_graph_2D_slices, plot_graph_2D_gradient_slices, create_movie_2D_slices, create_trace_3D
 from stein_lib.prm_utils import get_graph
 
-torch.set_default_dtype(torch.float64)
+dtype = torch.float32
+torch.set_default_dtype(dtype)
 device_ = torch.device("cpu")#torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.set_default_device(device_)
 
@@ -49,7 +50,7 @@ def test_brain_3D():
     else:
         bandwidth = 250.
 
-    repulsive_scaling = 1.
+    repulsive_scaling = 1
     if analytic_grads:
         repulsive_scaling = -repulsive_scaling
     step_size = 1.
@@ -102,7 +103,7 @@ def test_brain_3D():
         # Load model
         from Bayesian_Hilbert_Maps import bhmlib
         bhm_path = Path(bhmlib.__path__[0]).resolve()
-        model_file = bhm_path / 'Outputs' / 'saved_models' / 'bhm_remind_test_log_res1.5_iter125.pt'
+        model_file = bhm_path / 'Outputs' / 'saved_models' / 'bhm_remind_3D_res2_final.pt'
 
         if not lim_func:
             grad_ax_limits = None
@@ -136,13 +137,13 @@ def test_brain_3D():
         #=============================================
 
         
-        particles_ = particles.detach().numpy()
+        particles_ = particles.detach().cpu().numpy()
         particles_ = np.transpose(particles_)
-        particles_ = np.concatenate((particles_, np.ones(1, np.shape(particles_)[1])))
+        particles_ = np.concatenate((particles_, np.ones((1, np.shape(particles_)[1]))))
         particles_ = np.matmul(transform, particles_)
         particles_ = np.transpose(particles_[:,0:3])
-        old_particles = np.loadtxt("./remind_001_samples.txt")
-        particles_ = np.vstack((old_particles[:,0:3], particles_))
+        # old_particles = np.loadtxt("./remind_001_samples.txt")
+        # particles_ = np.vstack((old_particles[:,0:3], particles_))
         np.savetxt("./remind_001_samples.txt", particles_, fmt='%9f ')
 
         fig_prename = f"./figures/{optimizer.__class__.__name__}_{kernel.__class__.__name__}_np_{num_particles}_iters_{iters}_eps_{step_size}_repulsive_{repulsive_scaling}_bw_{bandwidth}_limfunc_{lim_func}_analytic_{analytic_grads}"
@@ -150,15 +151,15 @@ def test_brain_3D():
 
 
         plot_graph_2D_slices(particles.detach(), model.log_prob, ax_limits=plot_ax_limits, to_numpy=True,
-            save_path=f"{fig_prename}_slice.png" , case_name=kernel_optim_str) 
+            save_path=f"{fig_prename}_slice.png" , case_name=kernel_optim_str, dtype=dtype) 
 
         # Make 2D slice images of vacancy log prob, particles, and particle gradients
         plot_graph_2D_gradient_slices(particles.detach(), model.log_prob, model.grad_log_p, svgd.phi, ax_limits=plot_ax_limits, to_numpy=True,
-            save_path=f"{fig_prename}_grad.png" , case_name=kernel_optim_str) 
+            save_path=f"{fig_prename}_grad.png" , case_name=kernel_optim_str, dtype=dtype) 
 
         # Make movie of 2D projections of particles moving 
         create_movie_2D_slices(p_hist, model.log_prob, to_numpy=True, save_path=f"{fig_prename}_slice.mp4" ,
-            ax_limits=plot_ax_limits, case_name=kernel_optim_str)
+            ax_limits=plot_ax_limits, case_name=kernel_optim_str, dtype=dtype)
         
         # Make 3D plot of the movement of all particles
         create_trace_3D(p_hist, model.log_prob, to_numpy=True, save_path=f"{fig_prename}_trace.png",

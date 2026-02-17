@@ -157,11 +157,11 @@ def make_map_ND():
         parameters = \
             {'remind': \
                 ( os.path.abspath('./remind_001_obstacles.txt'),
-                (5, 5, 5), #hinge point resolution
+                (6, 6, 6), #hinge point resolution
                 [[-80, 80], [-80, 80], [-80, 80]], #area [min1, max1, min2, max2]
-                25000,
+                30000,
                 None,
-                0.10, #gamma
+                0.15, #gamma
                 ),
             }
 
@@ -247,6 +247,11 @@ def make_map_ND():
             print('Saving map...')
             filename = 'bhm_{}_3D_res{}_iter{:03d}.pt'.format(dataset, q_resolution, ith_scan)
             bhm_mdl.save(save_path, filename)
+
+    if save_path is not None:
+        print('Saving map...')
+        filename = 'bhm_{}_3D_res{}_final.pt'.format(dataset, q_resolution)
+        bhm_mdl.save(save_path, filename)
 
 
 def make_map_3D():
@@ -601,7 +606,7 @@ def plot_bhm_all_slices(X, y, bhm_mdl, cell_max_min, q_resolution, avg_z, save_p
 
     pl.subplot(236)
     pl.title(f"numerical grad(log(1 - yq)) at z={avg_z}")
-    pl.quiver(Xq[:, 0], Xq[:, 1], grad_analytic[:,0], grad_analytic[:,1])
+    pl.quiver(Xq[:, 0], Xq[:, 1], grad_numerical[:,0], grad_numerical[:,1])
     # pl.colorbar()
     pl.axis('equal')
     # pl.xlim([cell_max_min[0][0], cell_max_min[0][1]]); pl.ylim([cell_max_min[1][0], cell_max_min[1][1]])

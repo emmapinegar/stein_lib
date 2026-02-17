@@ -181,7 +181,7 @@ def create_movie_2D(particle_hist, model, save_path="/tmp/stein_movie.mp4", ax_l
     plt.show()
 
 
-def plot_graph_2D_slices(particles, log_prob, save_path='/tmp/graph.png', to_numpy=False, ax_limits=[[-4,4],[4,4]], case_name=""):
+def plot_graph_2D_slices(particles, log_prob, save_path='/tmp/graph.png', to_numpy=False, ax_limits=[[-4,4],[4,4]], case_name="", dtype=torch.float32):
 
     if to_numpy:
         particles = particles.detach().cpu().numpy()
@@ -223,7 +223,7 @@ def plot_graph_2D_slices(particles, log_prob, save_path='/tmp/graph.png', to_num
     for slice_ind in range(len(X)):
         plt.subplot(1,len(X),slice_ind+1)
         if to_numpy:
-            grid = torch.from_numpy(slice_grids[slice_ind])
+            grid = torch.tensor(slice_grids[slice_ind], dtype=dtype)
             c = log_prob(grid.t()).cpu().numpy()
             C = np.exp(c).reshape(ngrid, ngrid)
         else:
@@ -243,7 +243,7 @@ def plot_graph_2D_slices(particles, log_prob, save_path='/tmp/graph.png', to_num
     plt.close()    
 
 
-def plot_graph_2D_gradient_slices(particles, log_prob, grad_log_prob, phi, save_path='/tmp/graph.png', to_numpy=False, ax_limits=[[-4,4],[4,4]], case_name=""):
+def plot_graph_2D_gradient_slices(particles, log_prob, grad_log_prob, phi, save_path='/tmp/graph.png', to_numpy=False, ax_limits=[[-4,4],[4,4]], case_name="", dtype=torch.float32):
 
     if to_numpy:
         particles = particles.detach().cpu().numpy()
@@ -286,27 +286,27 @@ def plot_graph_2D_gradient_slices(particles, log_prob, grad_log_prob, phi, save_
         
         # plt.subplot(1,len(X),slice_ind+1)
         if to_numpy:
-            grid = torch.from_numpy(slice_grids[slice_ind])
+            grid = torch.tensor(slice_grids[slice_ind], dtype=dtype)
             c = grad_log_prob(grid.t()).cpu().numpy()
-            particles_t = torch.tensor(slice_particles[slice_ind])
+            particles_t = torch.tensor(slice_particles[slice_ind], dtype=dtype)
             print(np.shape(slice_grids[slice_ind]))
             print(particles_t.size())
             particles_log = log_prob(grid.t())
             particles_grad = grad_log_prob(particles_t)
             particles_phi, dists_sq = phi(particles_t, particles_grad, dlog_lh=particles_grad)
-            particles_phi = 500*particles_phi.cpu().numpy()
+            particles_phi = 100*particles_phi.cpu().numpy()
             particles_grad = particles_grad.cpu().numpy()
             particles_log = np.exp(particles_log.cpu().numpy())
             # C = np.exp(c).reshape(ngrid, ngrid)
         else:
-            c = grad_log_prob(grid)
-            particles_t = torch.tensor(slice_particles[slice_ind])
+            # c = grad_log_prob(grid)
+            particles_t = torch.tensor(slice_particles[slice_ind], dtype=dtype)
             particles_grad = grad_log_prob(particles_t)
             particles_phi, dists_sq = phi(particles_t, particles_grad, dlog_lh=particles_grad)            
             # C = np.exp(grad_log_prob(grid)).reshape(ngrid, ngrid)
-        print(np.shape(c))
-        C = np.linalg.norm(c, axis=1)
-        print(np.shape(C))
+        # print(np.shape(c))
+        # C = np.linalg.norm(c, axis=1)
+        # print(np.shape(C))
         # plt.scatter(X[slice_ind], Y[slice_ind], c=C, s=1.5)
         # plt.contour(X[slice_ind].reshape(ngrid, ngrid), Y[slice_ind].reshape(ngrid, ngrid), C.reshape(ngrid,ngrid), num_levels, linewidths=1)
         # xlim = ax_limits[0]
@@ -325,10 +325,10 @@ def plot_graph_2D_gradient_slices(particles, log_prob, grad_log_prob, phi, save_
     ax.set_ylim(ax_limits[1][0], ax_limits[1][1])
     ax.set_zlim(ax_limits[2][0], ax_limits[2][1])
     plt.savefig(save_path)
-    plt.show() 
+    plt.close() 
 
 
-def create_movie_2D_slices(particle_hist, log_prob, save_path="/tmp/stein_movie.mp4", ax_limits=[[-4, 4],[4, 4]], to_numpy=False, case_name=""):
+def create_movie_2D_slices(particle_hist, log_prob, save_path="/tmp/stein_movie.mp4", ax_limits=[[-4, 4],[4, 4]], to_numpy=False, case_name="", dtype=torch.float32):
 
     fig = plt.figure(figsize=(15,5))
 
@@ -389,7 +389,7 @@ def create_movie_2D_slices(particle_hist, log_prob, save_path="/tmp/stein_movie.
     for slice_ind in range(len(X)):
         plt.subplot(1,len(X),slice_ind+1)
         if to_numpy:
-            grid = torch.from_numpy(slice_grids[slice_ind])
+            grid = torch.tensor(slice_grids[slice_ind], dtype=dtype)
             c = log_prob(grid.t()).cpu().numpy()
             # C = c.reshape(ngrid, ngrid)
             C = np.exp(c).reshape(ngrid, ngrid)
@@ -448,4 +448,4 @@ def create_trace_3D(particle_hist, log_prob, save_path="/tmp/stein_trace.png", a
     
 
     plt.savefig(save_path)
-    plt.show()
+    plt.close()
