@@ -75,12 +75,9 @@ def test_brain_3D():
     low_sample_limits = [grad_ax_limits[0][0] + sample_buffer, grad_ax_limits[1][0] + sample_buffer, grad_ax_limits[2][0] + sample_buffer]
     high_sample_limits = [grad_ax_limits[0][1] - sample_buffer, grad_ax_limits[1][1] - sample_buffer, grad_ax_limits[2][1] - sample_buffer] 
 
-    # low_sample_limits = [31., 55., 88.]
-    # high_sample_limits = [35., 60., 92.] 
-    print(f"low limits: {low_sample_limits} high limits: {high_sample_limits} buffer: {sample_buffer} {grad_ax_limits[0][0]} test: {grad_ax_limits[0][0] + sample_buffer}")
-    print(f"plot limits: {plot_ax_limits}")
+    print(f"low limits: {low_sample_limits} high limits: {high_sample_limits} buffer: {sample_buffer} {grad_ax_limits[0][0]} test: {grad_ax_limits[0][0] + sample_buffer} plot limits: {plot_ax_limits}")
     for i in range(1):
-        #========================== Sampling ==============================
+        ##========================== Sampling ==============================
         ## Large Gaussian in center of remind map.
         # prior_dist = Normal(loc=torch.tensor([30.,90.,15.]), scale=torch.tensor([20.,20.,20.]))
 
@@ -94,11 +91,10 @@ def test_brain_3D():
 
         # Uniform distribution
         prior_dist = Uniform(low=torch.tensor(low_sample_limits), high=torch.tensor(high_sample_limits))
-        # prior_dist = Uniform(low=torch.tensor([50., 70., 40.]), high=torch.tensor([170., 220., 130.]))
 
-        particles_0 = prior_dist.sample((num_particles,))
-        particles = particles_0.clone().cpu().numpy()
-        particles = torch.from_numpy(particles)
+        particles = prior_dist.sample((num_particles,))
+        # particles = particles_0.clone().cpu().numpy()
+        # particles = torch.tensor(particles)
 
         # Load model
         from Bayesian_Hilbert_Maps import bhmlib
@@ -136,7 +132,6 @@ def test_brain_3D():
 
         #=============================================
 
-        
         particles_ = particles.detach().cpu().numpy()
         particles_ = np.transpose(particles_)
         particles_ = np.concatenate((particles_, np.ones((1, np.shape(particles_)[1]))))
@@ -187,7 +182,7 @@ def test_brain_2D():
     lim_func = False
 
 
-    # Sample intial particles
+    # Sample initial particles
     torch.manual_seed(5432876)
 
     grad_ax_limits = [[35., 180.],[55., 230.],[68., 72.]]
@@ -202,15 +197,10 @@ def test_brain_2D():
     low_sample_limits = [grad_ax_limits[0][0] + sample_buffer, grad_ax_limits[1][0] + sample_buffer, grad_ax_limits[2][0] + sample_buffer]
     high_sample_limits = [grad_ax_limits[0][1] - sample_buffer, grad_ax_limits[1][1] - sample_buffer, grad_ax_limits[2][1] - sample_buffer] 
 
-    # low_sample_limits = [31., 55., 88.]
-    # high_sample_limits = [35., 60., 92.] 
-    print(f"low limits: {low_sample_limits} high limits: {high_sample_limits} buffer: {sample_buffer} {grad_ax_limits[0][0]} test: {grad_ax_limits[0][0] + sample_buffer}")
-    print(f"plot limits: {plot_ax_limits}")
+    print(f"low limits: {low_sample_limits} high limits: {high_sample_limits} buffer: {sample_buffer} {grad_ax_limits[0][0]} test: {grad_ax_limits[0][0] + sample_buffer} plot limits: {plot_ax_limits}")
 
     ## Large Gaussian in center of intel map.
-    prior_dist = Normal(loc=torch.tensor([30.,90.]), scale=torch.tensor([10., 10.]))
-    particles_0 = prior_dist.sample((num_particles,))
-    print(f"particles: {particles_0.size()}")
+    # prior_dist = Normal(loc=torch.tensor([30.,90.]), scale=torch.tensor([10., 10.]))
 
     ## Small gaussian in corner of intel map.
     # prior_dist = Normal(loc=torch.tensor([12.,-3.]), scale=torch.tensor([1.,1.]))
@@ -222,12 +212,11 @@ def test_brain_2D():
 
     ## Uniform distribution
     prior_dist = Uniform(low=torch.tensor([-25., 25.]), high=torch.tensor([92., 147.]))
-    particles_1 = prior_dist.sample((num_particles//2,))
+    # particles_1 = prior_dist.sample((num_particles//2,))
 
-    particles_0 = torch.vstack((particles_0, particles_1))
-    print(f"particles: {particles_0.size()}")
+    particles = prior_dist.sample((num_particles,))
 
-    
+    # particles = torch.vstack((particles_0, particles_1))
 
     # Load model
     from Bayesian_Hilbert_Maps import bhmlib
@@ -235,7 +224,7 @@ def test_brain_2D():
     model_file = bhm_path / 'Outputs' / 'saved_models' / 'bhm_remind_test_log_res1.5_iter200.pt'
     if not lim_func:
         grad_ax_limits = None
-    model = BayesianHilbertMap(model_file, grad_ax_limits, dim=3, device=device_)
+    model = BayesianHilbertMap(model_file, grad_ax_limits, dim=2, device=device_)
     
     #================== Kernel ===========================
 

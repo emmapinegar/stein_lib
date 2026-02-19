@@ -174,11 +174,13 @@ class SVGD():
         # SVGD attractive / repulsive terms, inter-particle distances
         grad, rep, pw_dists_sq = self.get_svgd_terms(X, dlog_p, M,)
 
-        if self.verbose:
-            print(f"grad l2: {grad.norm().detach().cpu().numpy():5.4f} rep l2: {rep.norm().detach().cpu().numpy():5.4f} grad: {grad[0].detach().cpu().numpy()} rep: {rep[0].detach().cpu().numpy()}")
-
         # SVGD gradient
         phi = grad + self.repulsive_scaling * rep
+
+        if self.verbose:
+            print(f"grad l2: {grad.norm().detach().cpu().numpy():5.4f} rep l2: {rep.norm().detach().cpu().numpy():5.4f} phi l2: {phi.norm().detach().cpu().numpy()} grad: {grad[0].detach().cpu().numpy()} rep: {rep[0].detach().cpu().numpy()} phi: {phi[0].detach().cpu().numpy()}")
+
+
 
         self._pw_dists_sq = pw_dists_sq
         self._X = X
