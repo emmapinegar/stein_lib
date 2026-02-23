@@ -161,7 +161,7 @@ def make_map_ND():
                 [[-80, 80], [-80, 80], [-80, 80]], #area [min1, max1, min2, max2]
                 30000,
                 None,
-                0.15, #gamma
+                0.10, #gamma
                 ),
             }
 
@@ -237,7 +237,7 @@ def make_map_ND():
         t2 = time.time()
 
         if ith_scan % plot_iter == 0:
-            img_name = f"./Bayesian_Hilbert_Maps/bhmlib/Outputs/images/remind_3D_{ith_scan:03d}.pdf"
+            img_name = f"./Bayesian_Hilbert_Maps/bhmlib/Outputs/images/remind_3D_res{cell_resolution[0]}_gamma{gamma}_{ith_scan:03d}.pdf"
             plot_index = pt.where(pt.logical_and(X_train[:,2] >= avg_z, X_train[:,2] < avg_z + 1))[0]
             X = X_train[plot_index,:]
             y = Y_train[plot_index]
@@ -245,12 +245,12 @@ def make_map_ND():
 
         if save_path is not None and ith_scan % save_iter == 0:
             print('Saving map...')
-            filename = 'bhm_{}_3D_res{}_iter{:03d}.pt'.format(dataset, q_resolution, ith_scan)
+            filename = f"bhm_{dataset}_3D_res{cell_resolution[0]}_gamma{gamma}_iter{ith_scan:03d}.pt"
             bhm_mdl.save(save_path, filename)
 
     if save_path is not None:
         print('Saving map...')
-        filename = 'bhm_{}_3D_res{}_final.pt'.format(dataset, q_resolution)
+        filename = f"bhm_{dataset}_3D_res{cell_resolution[0]}_gamma{gamma}_final.pt"
         bhm_mdl.save(save_path, filename)
 
 

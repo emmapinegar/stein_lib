@@ -55,15 +55,17 @@ class BayesianHilbertMap:
             log_p -= torch.exp( self.limit_scale*(x[:, 0] - self.limits[0, 1]))
             log_p -= torch.exp(-self.limit_scale*(x[:, 1] - self.limits[1, 0]))
             log_p -= torch.exp( self.limit_scale*(x[:, 1] - self.limits[1, 1]))
+            z_str = ""
             if self.dim > 2:
                 log_p -= torch.exp(-self.limit_scale*(x[:, 2] - self.limits[2, 0]))
                 log_p -= torch.exp( self.limit_scale*(x[:, 2] - self.limits[2, 1]))  
-                print_str = f"{print_str} new: {log_p[0]:5.6f} x: {x[0,0] - self.limits[0,0]:5.6f} {x[0,0] - self.limits[0,1]:5.6f} y: {x[0,1] - self.limits[1,0]:5.6f} {x[0,1] - self.limits[1,1]:5.6f} z: {x[0,2] - self.limits[2,0]:5.6f} {x[0,2] - self.limits[2,1]:5.6f}"    
+                z_str = f" z: {x[0,2] - self.limits[2,0]:5.6f} {x[0,2] - self.limits[2,1]:5.6f}"
+            print_str = f"{print_str} new: {log_p[0]:5.6f} x: {x[0,0] - self.limits[0,0]:5.6f} {x[0,0] - self.limits[0,1]:5.6f} y: {x[0,1] - self.limits[1,0]:5.6f} {x[0,1] - self.limits[1,1]:5.6f} {z_str}"    
         print(print_str)                              
         return log_p
 
-    def grad_log_p(self, x):
-        return self.bhm.grad_log_p_vacancy(x)
+    def grad_log_p(self, x, sub_limits=True):
+        return self.bhm.grad_log_p_vacancy(x, sub_limits=sub_limits)
 
 if __name__ == '__main__':
 

@@ -29,9 +29,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.animation as animation
 
-num_levels = 20
+num_levels = 25
 slice_buffer = 2
 ngrid = 70
+colormap = 'plasma'
 
 def get_jacobian(gradient, X,):
     """
@@ -181,7 +182,7 @@ def create_movie_2D(particle_hist, model, save_path="/tmp/stein_movie.mp4", ax_l
     plt.show()
 
 
-def plot_graph_2D_slices(particles, log_prob, save_path='/tmp/graph.png', to_numpy=False, ax_limits=[[-4,4],[4,4]], case_name="", dtype=torch.float32):
+def plot_graph_2D_slices(particles, log_prob, save_path='/tmp/graph.png', to_numpy=False, ax_limits=[[-4,4],[4,4]], case_name="", dtype=torch.float32, grad_limits=None):
 
     if to_numpy:
         particles = particles.detach().cpu().numpy()
@@ -195,6 +196,7 @@ def plot_graph_2D_slices(particles, log_prob, save_path='/tmp/graph.png', to_num
     # C = []
     slice_grids = []
     slice_particles = []
+    slice_grad_bounds = []
 
     # slice 1, xy plane
     x1 = np.linspace(ax_limits[0][0], ax_limits[0][1], ngrid)
@@ -204,6 +206,7 @@ def plot_graph_2D_slices(particles, log_prob, save_path='/tmp/graph.png', to_num
     X += [X1]; Y+= [Y1]; Z += [Z1]
     slice_grids += [np.vstack((np.ndarray.flatten(X1), np.ndarray.flatten(Y1),np.ndarray.flatten(Z1)))]
     slice_particles += [particles[np.where(np.logical_and(particles[:,2] >= z1[0] - slice_buffer, particles[:,2] <= z1[0] + slice_buffer))[0], 0:2]]      
+    slice_grad_bounds += [[[grad_limits[0][0], grad_limits[0][0], grad_limits[0][1], grad_limits[0][1], grad_limits[0][0]], [grad_limits[1][0], grad_limits[1][1], grad_limits[1][1], grad_limits[1][0], grad_limits[1][0]]]]
 
     # slice 2, xz plane
     z2 = np.linspace(ax_limits[2][0], ax_limits[2][1], ngrid)
@@ -212,6 +215,8 @@ def plot_graph_2D_slices(particles, log_prob, save_path='/tmp/graph.png', to_num
     X += [X2]; Y+= [Z2]; Z += [Y2]
     slice_grids += [np.vstack((np.ndarray.flatten(X2), np.ndarray.flatten(Y2),np.ndarray.flatten(Z2)))]
     slice_particles += [particles[np.where(np.logical_and(particles[:,1] >= y2[0] - slice_buffer, particles[:,1] <= y2[0] + slice_buffer))[0], 0:3:2]] 
+    slice_grad_bounds += [[[grad_limits[0][0], grad_limits[0][0], grad_limits[0][1], grad_limits[0][1], grad_limits[0][0]], [grad_limits[2][0], grad_limits[2][1], grad_limits[2][1], grad_limits[2][0], grad_limits[2][0]]]]
+
 
     # slice 3, yz plane
     x3 = np.array([(ax_limits[0][1] - ax_limits[0][0])//2 + ax_limits[0][0]])
@@ -219,9 +224,10 @@ def plot_graph_2D_slices(particles, log_prob, save_path='/tmp/graph.png', to_num
     X += [Y3]; Y+= [Z3]; Z += [X3]
     slice_grids += [np.vstack((np.ndarray.flatten(X3), np.ndarray.flatten(Y3),np.ndarray.flatten(Z3)))]
     slice_particles += [particles[np.where(np.logical_and(particles[:,0] >= x3[0] - slice_buffer, particles[:,0] <= x3[0] + slice_buffer))[0], 1:]] 
+    slice_grad_bounds += [[[grad_limits[1][0], grad_limits[1][0], grad_limits[1][1], grad_limits[1][1], grad_limits[1][0]], [grad_limits[2][0], grad_limits[2][1], grad_limits[2][1], grad_limits[2][0], grad_limits[2][0]]]]
 
     for slice_ind in range(len(X)):
-        plt.subplot(1,len(X),slice_ind+1)
+        plt.subplot(2,len(X),slice_ind+1)
         if to_numpy:
             grid = torch.tensor(slice_grids[slice_ind], dtype=dtype)
             c = log_prob(grid.t()).cpu().numpy()
@@ -229,12 +235,21 @@ def plot_graph_2D_slices(particles, log_prob, save_path='/tmp/graph.png', to_num
         else:
             C = np.exp(log_prob(grid)).reshape(ngrid, ngrid)
         # plt.scatter(X[slice_ind], Y[slice_ind], c=C, s=1.5)
-        plt.contourf(X[slice_ind].reshape(ngrid, ngrid), Y[slice_ind].reshape(ngrid, ngrid), C, num_levels, vmax=1, vmin=0)
-        # xlim = ax_limits[0]
-        # ylim = ax_limits[1]
+        plt.contourf(X[slice_ind].reshape(ngrid, ngrid), Y[slice_ind].reshape(ngrid, ngrid), C, num_levels, vmax=1, vmin=0, cmap=colormap)
+
+        plt.plot(slice_grad_bounds[slice_ind][0], slice_grad_bounds[slice_ind][1], 'r-')
         plt.plot(slice_particles[slice_ind][:, 0], slice_particles[slice_ind][:, 1], 'ro', markersize=3)
         plt.axis('equal')
         plt.colorbar()
+
+        print(f"c: {np.min(c)} {np.max(c)}")
+        plt.subplot(2,len(X),slice_ind+1+len(X))
+        plt.contourf(X[slice_ind].reshape(ngrid, ngrid), Y[slice_ind].reshape(ngrid, ngrid), np.clip(c, a_min=-10, a_max=0).reshape(ngrid, ngrid), num_levels, vmin=-10, vmax=0, cmap=colormap)
+
+        plt.plot(slice_grad_bounds[slice_ind][0], slice_grad_bounds[slice_ind][1], 'r-')
+        plt.plot(slice_particles[slice_ind][:, 0], slice_particles[slice_ind][:, 1], 'ro', markersize=3)
+        plt.axis('equal')
+        plt.colorbar()       
 
         # ax.set_xlim(xlim)
         # ax.set_ylim(ylim)
@@ -243,12 +258,12 @@ def plot_graph_2D_slices(particles, log_prob, save_path='/tmp/graph.png', to_num
     plt.close()    
 
 
-def plot_graph_2D_gradient_slices(particles, log_prob, grad_log_prob, phi, save_path='/tmp/graph.png', to_numpy=False, ax_limits=[[-4,4],[4,4]], case_name="", dtype=torch.float32):
+def plot_graph_2D_gradient_slices(particles, log_prob, grad_log_prob, phi, save_path='/tmp/graph.png', to_numpy=False, ax_limits=[[-4,4],[4,4]], case_name="", dtype=torch.float32, grad_limits=None):
 
     if to_numpy:
         particles = particles.detach().cpu().numpy()
 
-    fig = plt.figure(figsize=(15,5))
+    fig = plt.figure(figsize=(15,15))
     plt.suptitle(case_name + '\n' + str(0) + '$ ^{th}$ iteration')
 
     X = []
@@ -257,6 +272,7 @@ def plot_graph_2D_gradient_slices(particles, log_prob, grad_log_prob, phi, save_
     # C = []
     slice_grids = []
     slice_particles = []
+    slice_grad_bounds = []
 
     # slice 1, xy plane
     x1 = np.linspace(ax_limits[0][0], ax_limits[0][1], ngrid)
@@ -266,6 +282,7 @@ def plot_graph_2D_gradient_slices(particles, log_prob, grad_log_prob, phi, save_
     X += [X1]; Y+= [Y1]; Z += [Z1]
     slice_grids += [np.vstack((np.ndarray.flatten(X1), np.ndarray.flatten(Y1),np.ndarray.flatten(Z1)))]
     slice_particles += [particles[np.where(np.logical_and(particles[:,2] >= z1[0], particles[:,2] <= z1[0] + slice_buffer))[0], :]]      
+    slice_grad_bounds += [[[grad_limits[0][0], grad_limits[0][0], grad_limits[0][1], grad_limits[0][1], grad_limits[0][0]], [grad_limits[1][0], grad_limits[1][1], grad_limits[1][1], grad_limits[1][0], grad_limits[1][0]], [z1, z1, z1, z1, z1]]]
 
     # slice 2, xz plane
     z2 = np.linspace(ax_limits[2][0], ax_limits[2][1], ngrid)
@@ -274,6 +291,8 @@ def plot_graph_2D_gradient_slices(particles, log_prob, grad_log_prob, phi, save_
     X += [X2]; Y+= [Y2]; Z += [Z2]
     slice_grids += [np.vstack((np.ndarray.flatten(X2), np.ndarray.flatten(Y2),np.ndarray.flatten(Z2)))]
     slice_particles += [particles[np.where(np.logical_and(particles[:,1] >= y2[0], particles[:,1] <= y2[0] + slice_buffer))[0], :]] 
+    slice_grad_bounds += [[[grad_limits[0][0], grad_limits[0][0], grad_limits[0][1], grad_limits[0][1], grad_limits[0][0]], [y2, y2, y2, y2, y2], [grad_limits[2][0], grad_limits[2][1], grad_limits[2][1], grad_limits[2][0], grad_limits[2][0]]]]
+
 
     # slice 3, yz plane
     x3 = np.array([(ax_limits[0][1] - ax_limits[0][0])//2 + ax_limits[0][0]])
@@ -281,21 +300,21 @@ def plot_graph_2D_gradient_slices(particles, log_prob, grad_log_prob, phi, save_
     X += [X3]; Y+= [Y3]; Z += [Z3]
     slice_grids += [np.vstack((np.ndarray.flatten(X3), np.ndarray.flatten(Y3),np.ndarray.flatten(Z3)))]
     slice_particles += [particles[np.where(np.logical_and(particles[:,0] >= x3[0], particles[:,0] <= x3[0] + slice_buffer))[0], :]] 
+    slice_grad_bounds += [[[x3, x3, x3, x3, x3], [grad_limits[1][0], grad_limits[1][0], grad_limits[1][1], grad_limits[1][1], grad_limits[1][0]], [grad_limits[2][0], grad_limits[2][1], grad_limits[2][1], grad_limits[2][0], grad_limits[2][0]]]]
+
     ax = fig.add_subplot(projection='3d')
-    for slice_ind in range(1): #range(len(X)):
+    for slice_ind in range(len(X)):
         
         # plt.subplot(1,len(X),slice_ind+1)
         if to_numpy:
             grid = torch.tensor(slice_grids[slice_ind], dtype=dtype)
-            c = grad_log_prob(grid.t()).cpu().numpy()
+            # c = grad_log_prob(grid.t(), sub_limits=False).cpu().numpy() # i think we have to sub limits here 
             particles_t = torch.tensor(slice_particles[slice_ind], dtype=dtype)
-            print(np.shape(slice_grids[slice_ind]))
-            print(particles_t.size())
             particles_log = log_prob(grid.t())
-            particles_grad = grad_log_prob(particles_t)
+            particles_grad = grad_log_prob(particles_t, sub_limits=False)
             particles_phi, dists_sq = phi(particles_t, particles_grad, dlog_lh=particles_grad)
-            particles_phi = 100*particles_phi.cpu().numpy()
-            particles_grad = particles_grad.cpu().numpy()
+            particles_phi = 500*particles_phi.detach().cpu().numpy()
+            particles_grad = particles_grad.detach().cpu().numpy()
             particles_log = np.exp(particles_log.cpu().numpy())
             # C = np.exp(c).reshape(ngrid, ngrid)
         else:
@@ -311,7 +330,8 @@ def plot_graph_2D_gradient_slices(particles, log_prob, grad_log_prob, phi, save_
         # plt.contour(X[slice_ind].reshape(ngrid, ngrid), Y[slice_ind].reshape(ngrid, ngrid), C.reshape(ngrid,ngrid), num_levels, linewidths=1)
         # xlim = ax_limits[0]
         # ylim = ax_limits[1]
-        ax.scatter(slice_grids[slice_ind][0,:], slice_grids[slice_ind][1, :], slice_grids[slice_ind][2, :], s=2, c=particles_log)
+        ax.scatter(slice_grad_bounds[slice_ind][0], slice_grad_bounds[slice_ind][1], slice_grad_bounds[slice_ind][2], c='k')
+        ax.scatter(slice_grids[slice_ind][0,:], slice_grids[slice_ind][1, :], slice_grids[slice_ind][2, :], s=0.25, c=particles_log, cmap=colormap)
         ax.scatter(slice_particles[slice_ind][:, 0], slice_particles[slice_ind][:, 1], slice_particles[slice_ind][:, 2], s=4, c='r')
         ax.quiver(slice_particles[slice_ind][:, 0], slice_particles[slice_ind][:, 1], slice_particles[slice_ind][:, 2], particles_phi[:,0], particles_phi[:,1], particles_phi[:,2])
 
@@ -321,16 +341,16 @@ def plot_graph_2D_gradient_slices(particles, log_prob, grad_log_prob, phi, save_
 
         # ax.set_xlim(xlim)
         # ax.set_ylim(ylim)
-    ax.set_xlim(ax_limits[0][0], ax_limits[0][1])
-    ax.set_ylim(ax_limits[1][0], ax_limits[1][1])
-    ax.set_zlim(ax_limits[2][0], ax_limits[2][1])
+    # ax.set_xlim(ax_limits[0][0], ax_limits[0][1])
+    # ax.set_ylim(ax_limits[1][0], ax_limits[1][1])
+    # ax.set_zlim(ax_limits[2][0], ax_limits[2][1])
     plt.savefig(save_path)
     plt.close() 
 
 
-def create_movie_2D_slices(particle_hist, log_prob, save_path="/tmp/stein_movie.mp4", ax_limits=[[-4, 4],[4, 4]], to_numpy=False, case_name="", dtype=torch.float32):
+def create_movie_2D_slices(particle_hist, log_prob, save_path="/tmp/stein_movie.mp4", ax_limits=[[-4, 4],[4, 4]], to_numpy=False, case_name="", dtype=torch.float32, grad_limits=None):
 
-    fig = plt.figure(figsize=(15,5))
+    fig = plt.figure(figsize=(15,10))
 
     plt.suptitle(case_name + '\n' + str(0) + '$ ^{th}$ iteration')
 
@@ -341,6 +361,7 @@ def create_movie_2D_slices(particle_hist, log_prob, save_path="/tmp/stein_movie.
     slice_grids = []
     slice_particles = []
     plot_particles = []
+    slice_grad_bounds = []
 
 
     x = np.linspace(ax_limits[0][0], ax_limits[0][1], ngrid)
@@ -354,6 +375,8 @@ def create_movie_2D_slices(particle_hist, log_prob, save_path="/tmp/stein_movie.
     X1, Y1, Z1 = np.meshgrid(x, y, z_slice)
     X += [X1]; Y += [Y1]; Z += [Z1]
     slice_grids += [np.vstack((np.ndarray.flatten(X1), np.ndarray.flatten(Y1),np.ndarray.flatten(Z1)))]
+    slice_grad_bounds += [[[grad_limits[0][0], grad_limits[0][0], grad_limits[0][1], grad_limits[0][1], grad_limits[0][0]], [grad_limits[1][0], grad_limits[1][1], grad_limits[1][1], grad_limits[1][0], grad_limits[1][0]]]]
+
 
     new_particle_hist = []
     for time_ind in range(len(particle_hist)):
@@ -366,6 +389,8 @@ def create_movie_2D_slices(particle_hist, log_prob, save_path="/tmp/stein_movie.
     X2, Y2, Z2 = np.meshgrid(x, y_slice, z)
     X += [X2]; Y += [Z2]; Z += [Y2]
     slice_grids += [np.vstack((np.ndarray.flatten(X2), np.ndarray.flatten(Y2),np.ndarray.flatten(Z2)))]
+    slice_grad_bounds += [[[grad_limits[0][0], grad_limits[0][0], grad_limits[0][1], grad_limits[0][1], grad_limits[0][0]], [grad_limits[2][0], grad_limits[2][1], grad_limits[2][1], grad_limits[2][0], grad_limits[2][0]]]]
+
 
     new_particle_hist = []
     for time_ind in range(len(particle_hist)):
@@ -378,6 +403,7 @@ def create_movie_2D_slices(particle_hist, log_prob, save_path="/tmp/stein_movie.
     X3, Y3, Z3 = np.meshgrid(x_slice, y, z)
     X += [Y3]; Y += [Z3]; Z += [X3]
     slice_grids += [np.vstack((np.ndarray.flatten(X3), np.ndarray.flatten(Y3),np.ndarray.flatten(Z3)))]
+    slice_grad_bounds += [[[grad_limits[1][0], grad_limits[1][0], grad_limits[1][1], grad_limits[1][1], grad_limits[1][0]], [grad_limits[2][0], grad_limits[2][1], grad_limits[2][1], grad_limits[2][0], grad_limits[2][0]]]]
 
     new_particle_hist = []
     for time_ind in range(len(particle_hist)):
@@ -387,7 +413,7 @@ def create_movie_2D_slices(particle_hist, log_prob, save_path="/tmp/stein_movie.
     slice_particles += [new_particle_hist]
 
     for slice_ind in range(len(X)):
-        plt.subplot(1,len(X),slice_ind+1)
+        plt.subplot(2,len(X),slice_ind+1)
         if to_numpy:
             grid = torch.tensor(slice_grids[slice_ind], dtype=dtype)
             c = log_prob(grid.t()).cpu().numpy()
@@ -397,14 +423,20 @@ def create_movie_2D_slices(particle_hist, log_prob, save_path="/tmp/stein_movie.
             C = np.exp(log_prob(slice_grids[slice_ind]),).reshape(ngrid, ngrid)
             # C = log_prob(slice_grids[slice_ind]).reshape(ngrid, ngrid)
 
-        plt.contourf(X[slice_ind].reshape(ngrid, ngrid), Y[slice_ind].reshape(ngrid, ngrid), C, num_levels, vmax=1, vmin=0)
-        # xlim = ax_limits[0]
-        # ylim = ax_limits[1]
+        plt.plot(slice_grad_bounds[slice_ind][0], slice_grad_bounds[slice_ind][1], 'r-')
+        plt.contourf(X[slice_ind].reshape(ngrid, ngrid), Y[slice_ind].reshape(ngrid, ngrid), C, num_levels, vmax=1, vmin=0, cmap=colormap)
         plt.axis('equal')
         # plt.colorbar()
         p_start =  slice_particles[slice_ind][0]
         particles = plt.plot(p_start[:, 0], p_start[:, 1], 'ro', markersize=3)
-        plot_particles += [particles]
+
+        plt.subplot(2,len(X),slice_ind+1+len(X))
+        plt.plot(slice_grad_bounds[slice_ind][0], slice_grad_bounds[slice_ind][1], 'r-')
+        plt.contourf(X[slice_ind].reshape(ngrid, ngrid), Y[slice_ind].reshape(ngrid, ngrid), np.clip(c, a_min=-10, a_max=0).reshape(ngrid, ngrid), num_levels, vmin=-10, vmax=0, cmap=colormap)
+        plt.axis('equal') 
+        plt.plot(p_start[:, 0], p_start[:, 1], 'ro', markersize=3)       
+
+        plot_particles += [particles] #TODO: fix log plot plotting animation of particles
         n_iter = len(slice_particles[slice_ind])
 
     def _init():  # only required for blitting to give a clean slate.
@@ -414,17 +446,21 @@ def create_movie_2D_slices(particle_hist, log_prob, save_path="/tmp/stein_movie.
     def _animate(i):
         plt.suptitle(case_name + '\n' + str(i) + '$ ^{th}$ iteration')
         for slice_ind in range(len(X)):
-            plt.subplot(1, len(X), slice_ind+1)
+            plt.subplot(2, len(X), slice_ind+1)
 
             pos = slice_particles[slice_ind][i]
             plot_particles[slice_ind][0].set_xdata(pos[:, 0])
             plot_particles[slice_ind][0].set_ydata(pos[:, 1])
+
+            plt.subplot(2,len(X),slice_ind+1+len(X))
+            plot_particles[slice_ind][0].set_xdata(pos[:, 0])
+            plot_particles[slice_ind][0].set_ydata(pos[:, 1])            
         return plot_particles
 
     ani = animation.FuncAnimation(fig, _animate, frames=n_iter, init_func=_init, interval=200,)
 
     ani.save(save_path)
-    plt.show()
+    plt.close()
 
 
 def create_trace_3D(particle_hist, log_prob, save_path="/tmp/stein_trace.png", ax_limits=[[-4, 4],[4, 4]], to_numpy=False, case_name=""):
@@ -438,9 +474,9 @@ def create_trace_3D(particle_hist, log_prob, save_path="/tmp/stein_trace.png", a
 
 
     ax = fig.add_subplot(projection='3d')
-    opacities = np.linspace(0.2, 1.0, np.shape(particle_hist)[0])
+    opacities = np.linspace(0.1, 10, np.shape(particle_hist)[0])
     for particle_ind in range(np.shape(particle_hist)[1]):
-        ax.scatter(particle_hist[:,particle_ind,0], particle_hist[:,particle_ind,1], particle_hist[:,particle_ind,2], s=4*opacities,)
+        ax.scatter(particle_hist[:,particle_ind,0], particle_hist[:,particle_ind,1], particle_hist[:,particle_ind,2], s=opacities,)
         ax.plot(particle_hist[:,particle_ind,0], particle_hist[:,particle_ind,1], particle_hist[:,particle_ind,2], linewidth=0.5)
     ax.set_xlim(ax_limits[0][0], ax_limits[0][1])
     ax.set_ylim(ax_limits[1][0], ax_limits[1][1])

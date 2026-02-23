@@ -99,7 +99,7 @@ class RBF(BaseKernel):
         #     h = torch.clamp(h, min=tol)
         # else:
         #     h = np.clip(h, a_min=tol, a_max=None)
-
+        print(f"h: {h} bw: {self.bandwidth}")
         return h
 
     def eval(self, X, Y, M=None, compute_dK_dK_t=False, bw=None, **kwargs,):

@@ -41,7 +41,7 @@ def test_brain_3D():
     ###### Params ######
 
     num_particles = 10000
-    iters = 20
+    iters = 100
     analytic_grads = True
 
     median_heuristic = True
@@ -55,17 +55,18 @@ def test_brain_3D():
         repulsive_scaling = -repulsive_scaling
     step_size = 1.
 
-    lim_func = False
-    limit_scale = 1
+    lim_func = True
+    limit_scale = 1.
     transform = np.loadtxt("./remind_001_obstacles.txt", max_rows=4)
 
 
     # Sample intial particles
     torch.manual_seed(5432876)
 
-    grad_ax_limits = [[35., 180.],[55., 230.],[30., 140.]]
-    plot_buffer = 5.
-    sample_buffer = 0.5
+    grad_ax_limits = [[30., 185.],[50., 240.],[25., 145.]]
+    plot_buffer = 15.
+    sample_buffer = 2
+    plot_grad_limits = grad_ax_limits
 
     plot_ax_limits = [[0., 0.], [0., 0.], [0., 0.]]
     for limit_ind in range(len(plot_ax_limits)):
@@ -103,7 +104,7 @@ def test_brain_3D():
         # Load model
         from Bayesian_Hilbert_Maps import bhmlib
         bhm_path = Path(bhmlib.__path__[0]).resolve()
-        model_file = bhm_path / 'Outputs' / 'saved_models' / 'bhm_remind_3D_res2_final.pt'
+        model_file = bhm_path / 'Outputs' / 'saved_models' / 'bhm_remind_3D_res6_gamma0.1_final.pt'
 
         if not lim_func:
             grad_ax_limits = None
@@ -151,15 +152,15 @@ def test_brain_3D():
 
 
         plot_graph_2D_slices(particles.detach(), model.log_prob, ax_limits=plot_ax_limits, to_numpy=True,
-            save_path=f"{fig_prename}_slice.png" , case_name=kernel_optim_str, dtype=dtype) 
+            save_path=f"{fig_prename}_slice.png" , case_name=kernel_optim_str, dtype=dtype, grad_limits=plot_grad_limits) 
 
         # Make 2D slice images of vacancy log prob, particles, and particle gradients
         plot_graph_2D_gradient_slices(particles.detach(), model.log_prob, model.grad_log_p, svgd.phi, ax_limits=plot_ax_limits, to_numpy=True,
-            save_path=f"{fig_prename}_grad.png" , case_name=kernel_optim_str, dtype=dtype) 
+            save_path=f"{fig_prename}_grad.png" , case_name=kernel_optim_str, dtype=dtype, grad_limits=plot_grad_limits) 
 
         # Make movie of 2D projections of particles moving 
         create_movie_2D_slices(p_hist, model.log_prob, to_numpy=True, save_path=f"{fig_prename}_slice.mp4" ,
-            ax_limits=plot_ax_limits, case_name=kernel_optim_str, dtype=dtype)
+            ax_limits=plot_ax_limits, case_name=kernel_optim_str, dtype=dtype, grad_limits=plot_grad_limits)
         
         # Make 3D plot of the movement of all particles
         create_trace_3D(p_hist, model.log_prob, to_numpy=True, save_path=f"{fig_prename}_trace.png",
